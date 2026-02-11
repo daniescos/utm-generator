@@ -206,6 +206,19 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportGlobal = () => {
+    const json = exportConfig();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'config.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    setSuccess(translations.admin.configGlobalInstructions);
+    setTimeout(() => setSuccess(''), 8000);
+  };
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -680,7 +693,19 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                       className="hidden"
                     />
                   </label>
+                  <button
+                    onClick={handleExportGlobal}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    {translations.admin.exportConfigGlobal}
+                  </button>
                 </div>
+              </div>
+
+              {/* Global Config Help Text */}
+              <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+                <p className="text-sm text-blue-300">{translations.admin.saveConfigGlobalHelp}</p>
               </div>
 
               {/* Dangerous Actions */}
