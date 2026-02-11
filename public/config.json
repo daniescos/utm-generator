@@ -7,50 +7,92 @@
       "name": "utm_source",
       "label": "Source",
       "fieldType": "dropdown",
-      "options": ["google", "facebook", "email", "direct"],
+      "options": [
+        "sms",
+        "rcs",
+        "push",
+        "email",
+        "wibpush",
+        "whatsapp"
+      ],
       "order": 1,
       "isCustom": false,
-      "description": ""
+      "description": "teste_teste_teste"
     },
     {
       "id": "medium",
       "name": "utm_medium",
       "label": "Medium",
       "fieldType": "dropdown",
-      "options": ["cpc", "social", "email", "organic"],
+      "options": [
+        "journey_builder",
+        "gerenciador",
+        "imusica",
+        "ferramenta_x",
+        "ferramenta_y"
+      ],
       "order": 2,
-      "isCustom": false,
-      "description": ""
+      "isCustom": false
     },
     {
       "id": "campaign",
       "name": "utm_campaign",
       "label": "Campaign",
       "fieldType": "dropdown",
-      "options": [],
+      "options": [
+        "pacote_de_dados",
+        "migracao_pre_controle",
+        "migracao_controle_conta",
+        "movimentacao_conta_upgrade",
+        "movimentacao_controle_upgrade",
+        "banda_larga",
+        "aparelhos",
+        "acessorios",
+        "flex",
+        "portabilidade",
+        "beneficios",
+        "outros"
+      ],
       "order": 3,
-      "isCustom": false,
-      "description": ""
+      "isCustom": false
     },
     {
       "id": "term",
       "name": "utm_term",
       "label": "Term",
       "fieldType": "dropdown",
-      "options": [],
+      "options": [
+        "conta",
+        "controle",
+        "pre_pago",
+        "flex",
+        "combo_multi_controle",
+        "combo_multi_conta",
+        "banda_larga_single",
+        "banda_larga_pme",
+        "base_móvel",
+        "base_residencial"
+      ],
       "order": 4,
-      "isCustom": false,
-      "description": ""
+      "isCustom": false
     },
     {
       "id": "content",
       "name": "utm_content",
       "label": "Content",
-      "fieldType": "dropdown",
+      "fieldType": "string",
       "options": [],
       "order": 5,
-      "isCustom": false,
-      "description": ""
+      "isCustom": false
+    },
+    {
+      "id": "1770832842737-mn7x6l1wn",
+      "name": "utm_id",
+      "label": "ID",
+      "fieldType": "integer",
+      "options": [],
+      "order": 6,
+      "isCustom": true
     }
   ],
   "dependencies": []
