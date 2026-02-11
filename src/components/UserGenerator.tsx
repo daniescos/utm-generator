@@ -1,15 +1,19 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Copy, Check, Info } from 'lucide-react';
-import { loadConfig } from '../lib/storage';
+import { loadConfigAsync, loadConfig } from '../lib/storage';
 import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard } from '../lib/utils';
 import { translations } from '../lib/translations';
 import { Tooltip } from './Tooltip';
 
 export function UserGenerator() {
-  const config = loadConfig();
+  const [config, setConfig] = useState(loadConfig());
   const [baseUrl, setBaseUrl] = useState('');
   const [selectedValues, setSelectedValues] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    loadConfigAsync().then(setConfig);
+  }, []);
 
   const sortedFields = useMemo(() => {
     return [...config.fields].sort((a, b) => a.order - b.order);

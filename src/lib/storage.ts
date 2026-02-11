@@ -6,7 +6,11 @@ const CONFIG_KEY = 'utm_generator_config';
 // Load global config from public/config.json
 async function loadGlobalConfig(): Promise<AppConfig | null> {
   try {
-    const response = await fetch('/config.json');
+    // Add timestamp to bypass browser cache - ensures always fetches latest version
+    const timestamp = Date.now();
+    const response = await fetch(`/config.json?t=${timestamp}`, {
+      cache: 'no-store' // Additional directive to prevent caching
+    });
     if (response.ok) {
       const config = await response.json();
       // Ensure fields have all required properties
@@ -49,19 +53,41 @@ export function loadConfig(): AppConfig {
   }
 }
 
-// Async version: Load from global config first, then localStorage
+// Get the stored config version
+export function getStoredConfigVersion(): number {
+  try {
+    const stored = localStorage.getItem(CONFIG_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed.version || 0;
+    }
+  } catch {
+    return 0;
+  }
+  return 0;
+}
+
+// Async version: Load from global config, using localStorage only if version matches
 export async function loadConfigAsync(): Promise<AppConfig> {
   // Try to load global config first
   const globalConfig = await loadGlobalConfig();
   if (globalConfig) {
-    // Check if user has custom changes in localStorage
-    const stored = localStorage.getItem(CONFIG_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        return globalConfig;
+    // Check localStorage version vs global version
+    const storedVersion = getStoredConfigVersion();
+
+    // If versions match, user can have custom changes in localStorage
+    if (storedVersion === globalConfig.version) {
+      const stored = localStorage.getItem(CONFIG_KEY);
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          return globalConfig;
+        }
       }
+    } else {
+      // Version mismatch - admin updated config, use global and update localStorage
+      saveConfig(globalConfig);
     }
     return globalConfig;
   }

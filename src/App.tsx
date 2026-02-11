@@ -3,7 +3,7 @@ import './App.css';
 import { UserGenerator } from './components/UserGenerator';
 import { AdminPanel } from './components/AdminPanel';
 import { PasswordGuard } from './components/PasswordGuard';
-import { loadConfig } from './lib/storage';
+import { loadConfigAsync } from './lib/storage';
 import { translations } from './lib/translations';
 
 function App() {
@@ -12,7 +12,9 @@ function App() {
   const [adminPassword, setAdminPassword] = useState('');
 
   useEffect(() => {
-    setAdminPassword(loadConfig().adminPassword);
+    loadConfigAsync().then((config) => {
+      setAdminPassword(config.adminPassword);
+    });
   }, []);
 
   return (

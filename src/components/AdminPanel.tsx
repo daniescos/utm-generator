@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus, Trash2, Download, Upload, RotateCcw, Lock, Edit2 } from 'lucide-react';
-import { loadConfig, saveConfig, exportConfig, importConfig, resetConfig } from '../lib/storage';
+import { loadConfig, loadConfigAsync, saveConfig, exportConfig, importConfig, resetConfig } from '../lib/storage';
 import type { AppConfig, UTMField, DependencyRule } from '../lib/types';
 import { generateId, validateDependency } from '../lib/utils';
 import { translations } from '../lib/translations';
@@ -11,6 +11,10 @@ interface AdminPanelProps {
 
 export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [config, setConfig] = useState<AppConfig>(loadConfig());
+
+  useEffect(() => {
+    loadConfigAsync().then(setConfig);
+  }, []);
   const [activeTab, setActiveTab] = useState<'fields' | 'options' | 'dependencies' | 'config'>('fields');
   const [newPassword, setNewPassword] = useState('');
   const [showNewFieldForm, setShowNewFieldForm] = useState(false);
