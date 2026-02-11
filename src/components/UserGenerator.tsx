@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Info } from 'lucide-react';
 import { loadConfig } from '../lib/storage';
 import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard } from '../lib/utils';
+import { translations } from '../lib/translations';
+import { Tooltip } from './Tooltip';
 
 export function UserGenerator() {
   const config = loadConfig();
@@ -37,8 +39,8 @@ export function UserGenerator() {
         <div className="bg-black/80 backdrop-blur-sm rounded-lg border border-red-900/50 shadow-2xl">
           {/* Header */}
           <div className="border-b border-red-900/50 p-6">
-            <h1 className="text-3xl font-bold text-white">UTM Link Generator</h1>
-            <p className="text-gray-400 mt-2">Generate properly formatted UTM parameters</p>
+            <h1 className="text-3xl font-bold text-white">{translations.generator.title}</h1>
+            <p className="text-gray-400 mt-2">{translations.generator.subtitle}</p>
           </div>
 
           {/* Main Content */}
@@ -46,13 +48,13 @@ export function UserGenerator() {
             {/* Base URL Input */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Base URL
+                {translations.generator.baseUrl}
               </label>
               <input
                 type="url"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://example.com"
+                placeholder={translations.generator.baseUrlPlaceholder}
                 className="w-full px-4 py-3 bg-gray-900 border border-red-900/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-500/50 transition-all duration-300"
               />
             </div>
@@ -60,7 +62,7 @@ export function UserGenerator() {
             {/* UTM Fields */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-4">
-                UTM Parameters
+                {translations.generator.utmParameters}
               </label>
               <div className="space-y-3">
                 {sortedFields.map(field => {
@@ -72,8 +74,13 @@ export function UserGenerator() {
 
                   return (
                     <div key={field.id}>
-                      <label htmlFor={field.id} className="block text-xs font-medium text-gray-400 mb-1">
+                      <label htmlFor={field.id} className="block text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
                         {field.label}
+                        {field.description && (
+                          <Tooltip content={field.description}>
+                            <Info className="w-4 h-4 text-gray-500 hover:text-gray-300 transition-colors cursor-help" />
+                          </Tooltip>
+                        )}
                       </label>
 
                       {field.fieldType === 'dropdown' && (
@@ -83,7 +90,7 @@ export function UserGenerator() {
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                           className="w-full px-4 py-2 bg-gray-900 border border-red-900/50 rounded-lg text-white focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-500/50 transition-all duration-300"
                         >
-                          <option value="">Select {field.label}...</option>
+                          <option value="">{translations.generator.selectFieldPlaceholder(field.label)}</option>
                           {availableOptions.map(option => (
                             <option key={option} value={option}>
                               {option}
@@ -98,7 +105,7 @@ export function UserGenerator() {
                           id={field.id}
                           value={selectedValues[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                          placeholder={`Enter ${field.label}...`}
+                          placeholder={translations.generator.enterFieldPlaceholder(field.label)}
                           className="w-full px-4 py-2 bg-gray-900 border border-red-900/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-500/50 transition-all duration-300"
                         />
                       )}
@@ -109,7 +116,7 @@ export function UserGenerator() {
                           id={field.id}
                           value={selectedValues[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                          placeholder={`Enter ${field.label}...`}
+                          placeholder={translations.generator.enterFieldPlaceholder(field.label)}
                           step="1"
                           className="w-full px-4 py-2 bg-gray-900 border border-red-900/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-500/50 transition-all duration-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
@@ -123,7 +130,7 @@ export function UserGenerator() {
             {/* Generated URL */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Generated URL
+                {translations.generator.generatedUrl}
               </label>
               <div className="flex gap-2">
                 <input
@@ -141,7 +148,7 @@ export function UserGenerator() {
                 </button>
               </div>
               {copied && (
-                <p className="text-green-400 text-sm mt-2">Copied to clipboard!</p>
+                <p className="text-green-400 text-sm mt-2">{translations.generator.copiedMessage}</p>
               )}
             </div>
           </div>

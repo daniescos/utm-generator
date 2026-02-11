@@ -3,6 +3,7 @@ import { Plus, Trash2, Download, Upload, RotateCcw, Lock, Edit2 } from 'lucide-r
 import { loadConfig, saveConfig, exportConfig, importConfig, resetConfig } from '../lib/storage';
 import type { AppConfig, UTMField, DependencyRule } from '../lib/types';
 import { generateId, validateDependency } from '../lib/utils';
+import { translations } from '../lib/translations';
 
 interface AdminPanelProps {
   onLogout: () => void;
@@ -27,17 +28,18 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [editFieldLabel, setEditFieldLabel] = useState('');
   const [editFieldType, setEditFieldType] = useState<'dropdown' | 'string' | 'integer'>('dropdown');
   const [editFieldOptions, setEditFieldOptions] = useState('');
+  const [editFieldDescription, setEditFieldDescription] = useState('');
 
   const handleSave = () => {
     saveConfig(config);
-    setSuccess('Configuration saved successfully!');
+    setSuccess(translations.admin.successMessages.configurationSavedSuccessfully);
     setTimeout(() => setSuccess(''), 3000);
   };
 
   // Field Management
   const handleAddField = () => {
     if (!newFieldName.trim() || !newFieldLabel.trim()) {
-      setError('Field name and label are required');
+      setError(translations.admin.errorMessages.fieldNameAndLabelRequired);
       return;
     }
 
@@ -49,6 +51,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       options: [],
       order: config.fields.length + 1,
       isCustom: true,
+      description: undefined,
     };
 
     setConfig(prev => ({
@@ -66,7 +69,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const handleDeleteField = (fieldId: string) => {
     const field = config.fields.find(f => f.id === fieldId);
     if (field && !field.isCustom) {
-      setError('Cannot delete standard UTM fields');
+      setError(translations.admin.cannotDeleteStandardField);
       return;
     }
 
@@ -85,11 +88,12 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     setEditFieldLabel(field.label);
     setEditFieldType(field.fieldType);
     setEditFieldOptions(field.options.join('\n'));
+    setEditFieldDescription(field.description || '');
   };
 
   const handleSaveEditField = () => {
     if (!editFieldName.trim() || !editFieldLabel.trim()) {
-      setError('Field name and label are required');
+      setError(translations.admin.errorMessages.fieldNameAndLabelRequired);
       return;
     }
 
@@ -110,13 +114,14 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
               label: editFieldLabel,
               fieldType: editFieldType,
               options,
+              description: editFieldDescription || undefined,
             }
           : f
       ),
     }));
 
     setEditingFieldId(null);
-    setSuccess('Field updated successfully!');
+    setSuccess(translations.admin.fieldUpdatedSuccessfully);
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -126,6 +131,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     setEditFieldLabel('');
     setEditFieldType('dropdown');
     setEditFieldOptions('');
+    setEditFieldDescription('');
   };
 
   // Options Management
@@ -144,14 +150,14 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
     setFieldOptionsText('');
     setSelectedFieldForOptions(null);
-    setSuccess('Options updated!');
+    setSuccess(translations.admin.optionsUpdated);
     setTimeout(() => setSuccess(''), 3000);
   };
 
   // Dependency Management
   const handleAddDependency = () => {
     if (!newDependency.sourceField || !newDependency.sourceValue || !newDependency.targetField || !newDependency.allowedValues?.length) {
-      setError('All dependency fields are required');
+      setError(translations.admin.allDependencyFieldsRequired);
       return;
     }
 
@@ -177,6 +183,8 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     setNewDependency({});
     setShowDependencyForm(false);
     setError('');
+    setSuccess(translations.admin.dependencyAddedSuccessfully);
+    setTimeout(() => setSuccess(''), 3000);
   };
 
   const handleDeleteDependency = (ruleId: string) => {
@@ -208,10 +216,10 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
         const json = event.target?.result as string;
         const imported = importConfig(json);
         setConfig(imported);
-        setSuccess('Configuration imported successfully!');
+        setSuccess(translations.admin.configurationImportedSuccessfully);
         setTimeout(() => setSuccess(''), 3000);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Import failed');
+        setError(err instanceof Error ? err.message : translations.admin.errorMessages.importFailed);
       }
     };
     reader.readAsText(file);
@@ -220,7 +228,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   // Password
   const handlePasswordChange = () => {
     if (!newPassword.trim()) {
-      setError('Password cannot be empty');
+      setError(translations.admin.errorMessages.passwordCannotBeEmpty);
       return;
     }
 
@@ -230,7 +238,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     }));
 
     setNewPassword('');
-    setSuccess('Password updated!');
+    setSuccess(translations.admin.passwordUpdated);
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -244,15 +252,15 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
-            <p className="text-gray-400 mt-1">Configure UTM fields and dependencies</p>
+            <h1 className="text-3xl font-bold text-white">{translations.admin.title}</h1>
+            <p className="text-gray-400 mt-1">{translations.admin.subtitle}</p>
           </div>
           <button
             onClick={onLogout}
             className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg border border-red-900/50 transition-colors"
           >
             <Lock className="w-4 h-4" />
-            Logout
+            {translations.admin.logout}
           </button>
         </div>
 
@@ -270,19 +278,27 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-red-900/50">
-          {(['fields', 'options', 'dependencies', 'config'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === tab
-                  ? 'text-red-500 border-b-2 border-red-600'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
+          {(['fields', 'options', 'dependencies', 'config'] as const).map(tab => {
+            const tabLabels: Record<typeof tab, string> = {
+              fields: translations.admin.tabs.fields,
+              options: translations.admin.tabs.options,
+              dependencies: translations.admin.tabs.dependencies,
+              config: translations.admin.tabs.config,
+            };
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'text-red-500 border-b-2 border-red-600'
+                    : 'text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                {tabLabels[tab]}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab Content */}
@@ -295,41 +311,41 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Add Custom Field
+                {translations.admin.addCustomField}
               </button>
 
               {showNewFieldForm && (
                 <div className="border border-red-900/50 rounded-lg p-4 space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Field Name (UTM parameter)</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.fieldName}</label>
                     <input
                       type="text"
                       value={newFieldName}
                       onChange={(e) => setNewFieldName(e.target.value)}
-                      placeholder="e.g., utm_custom"
+                      placeholder={translations.admin.fieldNamePlaceholder}
                       className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Display Label</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.displayLabel}</label>
                     <input
                       type="text"
                       value={newFieldLabel}
                       onChange={(e) => setNewFieldLabel(e.target.value)}
-                      placeholder="e.g., Custom Field"
+                      placeholder={translations.admin.displayLabelPlaceholder}
                       className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Field Type</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.fieldType}</label>
                     <select
                       value={newFieldType}
                       onChange={(e) => setNewFieldType(e.target.value as 'dropdown' | 'string' | 'integer')}
                       className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
                     >
-                      <option value="dropdown">Dropdown (select from options)</option>
-                      <option value="string">Text Input (free text)</option>
-                      <option value="integer">Number Input (integers only)</option>
+                      <option value="dropdown">{translations.admin.fieldTypeDropdown}</option>
+                      <option value="string">{translations.admin.fieldTypeString}</option>
+                      <option value="integer">{translations.admin.fieldTypeInteger}</option>
                     </select>
                   </div>
                   <div className="flex gap-2">
@@ -337,13 +353,13 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                       onClick={handleAddField}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
                     >
-                      Add Field
+                      {translations.admin.addField}
                     </button>
                     <button
                       onClick={() => setShowNewFieldForm(false)}
                       className="px-4 py-2 bg-slate-700 hover:bg-gray-800 text-white rounded transition-colors"
                     >
-                      Cancel
+                      {translations.admin.cancel}
                     </button>
                   </div>
                 </div>
@@ -355,44 +371,53 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                     {editingFieldId === field.id ? (
                       <div className="border border-red-900/50 rounded-lg p-4 space-y-3 bg-slate-700/50">
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-1">Field Name (UTM parameter)</label>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.fieldName}</label>
                           <input
                             type="text"
                             value={editFieldName}
                             onChange={(e) => setEditFieldName(e.target.value)}
-                            placeholder="e.g., utm_custom"
+                            placeholder={translations.admin.fieldNamePlaceholder}
                             className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-1">Display Label</label>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.displayLabel}</label>
                           <input
                             type="text"
                             value={editFieldLabel}
                             onChange={(e) => setEditFieldLabel(e.target.value)}
-                            placeholder="e.g., Custom Field"
+                            placeholder={translations.admin.displayLabelPlaceholder}
                             className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-1">Field Type</label>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.fieldType}</label>
                           <select
                             value={editFieldType}
                             onChange={(e) => setEditFieldType(e.target.value as 'dropdown' | 'string' | 'integer')}
                             className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
                           >
-                            <option value="dropdown">Dropdown (select from options)</option>
-                            <option value="string">Text Input (free text)</option>
-                            <option value="integer">Number Input (integers only)</option>
+                            <option value="dropdown">{translations.admin.fieldTypeDropdown}</option>
+                            <option value="string">{translations.admin.fieldTypeString}</option>
+                            <option value="integer">{translations.admin.fieldTypeInteger}</option>
                           </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.description}</label>
+                          <textarea
+                            value={editFieldDescription}
+                            onChange={(e) => setEditFieldDescription(e.target.value)}
+                            placeholder={translations.admin.descriptionPlaceholder}
+                            className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600 font-mono text-sm h-16"
+                          />
                         </div>
                         {editFieldType === 'dropdown' && (
                           <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">Options (one per line)</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.options}</label>
                             <textarea
                               value={editFieldOptions}
                               onChange={(e) => setEditFieldOptions(e.target.value)}
-                              placeholder="Option 1&#10;Option 2&#10;Option 3"
+                              placeholder={translations.admin.optionsPlaceholder}
                               className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600 font-mono text-sm h-24"
                             />
                           </div>
@@ -402,13 +427,13 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                             onClick={handleSaveEditField}
                             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
                           >
-                            Save Changes
+                            {translations.admin.saveChangesField}
                           </button>
                           <button
                             onClick={handleCancelEditField}
                             className="px-4 py-2 bg-slate-700 hover:bg-gray-800 text-white rounded transition-colors"
                           >
-                            Cancel
+                            {translations.admin.cancel}
                           </button>
                         </div>
                       </div>
@@ -427,7 +452,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                           <button
                             onClick={() => handleStartEditField(field)}
                             className="p-2 hover:bg-blue-500/20 text-blue-400 rounded transition-colors"
-                            title="Edit field"
+                            title={translations.admin.editField}
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -435,7 +460,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                             <button
                               onClick={() => handleDeleteField(field.id)}
                               className="p-2 hover:bg-red-500/20 text-red-400 rounded transition-colors ml-1"
-                              title="Delete field"
+                              title={translations.admin.deleteField}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -453,7 +478,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
           {activeTab === 'options' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Select Field</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">{translations.admin.selectField}</label>
                 <select
                   value={selectedFieldForOptions || ''}
                   onChange={(e) => {
@@ -462,7 +487,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                   }}
                   className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
                 >
-                  <option value="">Choose a field...</option>
+                  <option value="">{translations.admin.chooseField}</option>
                   {sortedFields.map(field => (
                     <option key={field.id} value={field.id}>{field.label}</option>
                   ))}
@@ -473,17 +498,17 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                 <>
                   {config.fields.find(f => f.id === selectedFieldForOptions)?.fieldType !== 'dropdown' && (
                     <div className="p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-sm">
-                      Note: This field is a {config.fields.find(f => f.id === selectedFieldForOptions)?.fieldType} type and does not use options. Options are only used for dropdown fields.
+                      {translations.admin.noteNonDropdownField.replace('{fieldType}', config.fields.find(f => f.id === selectedFieldForOptions)?.fieldType || '')}
                     </div>
                   )}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Options (one per line)
+                      {translations.admin.options}
                     </label>
                     <textarea
                       value={fieldOptionsText}
                       onChange={(e) => setFieldOptionsText(e.target.value)}
-                      placeholder="Option 1&#10;Option 2&#10;Option 3"
+                      placeholder={translations.admin.optionsPlaceholder}
                       disabled={config.fields.find(f => f.id === selectedFieldForOptions)?.fieldType !== 'dropdown'}
                       className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600 font-mono text-sm h-32 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
@@ -492,7 +517,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                       disabled={config.fields.find(f => f.id === selectedFieldForOptions)?.fieldType !== 'dropdown'}
                       className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed"
                     >
-                      Save Options
+                      {translations.admin.saveOptions}
                     </button>
                   </div>
                 </>
@@ -508,19 +533,19 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Add Dependency Rule
+                {translations.admin.addDependencyRule}
               </button>
 
               {showDependencyForm && (
                 <div className="border border-red-900/50 rounded-lg p-4 space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">If Field</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.ifField}</label>
                     <select
                       value={newDependency.sourceField || ''}
                       onChange={(e) => setNewDependency(prev => ({ ...prev, sourceField: e.target.value }))}
                       className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
                     >
-                      <option value="">Select field...</option>
+                      <option value="">{translations.admin.selectSourceField}</option>
                       {sortedFields.filter(f => f.fieldType === 'dropdown').map(f => (
                         <option key={f.id} value={f.id}>{f.label}</option>
                       ))}
@@ -529,13 +554,13 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
                   {newDependency.sourceField && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Equals</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.equals}</label>
                       <select
                         value={newDependency.sourceValue || ''}
                         onChange={(e) => setNewDependency(prev => ({ ...prev, sourceValue: e.target.value }))}
                         className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
                       >
-                        <option value="">Select value...</option>
+                        <option value="">{translations.admin.selectValue}</option>
                         {config.fields.find(f => f.id === newDependency.sourceField)?.options.map(opt => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
@@ -544,13 +569,13 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Then Limit Field</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.thenLimitField}</label>
                     <select
                       value={newDependency.targetField || ''}
                       onChange={(e) => setNewDependency(prev => ({ ...prev, targetField: e.target.value }))}
                       className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
                     >
-                      <option value="">Select field...</option>
+                      <option value="">{translations.admin.selectSourceField}</option>
                       {sortedFields.filter(f => f.fieldType === 'dropdown').map(f => (
                         <option key={f.id} value={f.id}>{f.label}</option>
                       ))}
@@ -559,7 +584,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
                   {newDependency.targetField && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">To These Values (one per line)</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.toTheseValues}</label>
                       <textarea
                         value={(newDependency.allowedValues || []).join('\n')}
                         onChange={(e) => setNewDependency(prev => ({
@@ -576,13 +601,13 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                       onClick={handleAddDependency}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
                     >
-                      Add Rule
+                      {translations.admin.addRule}
                     </button>
                     <button
                       onClick={() => setShowDependencyForm(false)}
                       className="px-4 py-2 bg-slate-700 hover:bg-gray-800 text-white rounded transition-colors"
                     >
-                      Cancel
+                      {translations.admin.cancel}
                     </button>
                   </div>
                 </div>
@@ -595,11 +620,12 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                   return (
                     <div key={rule.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
                       <p className="text-sm text-gray-300">
-                        If {sourceField?.label} = {rule.sourceValue}, then {targetField?.label} ∈ [{rule.allowedValues.join(', ')}]
+                        {translations.admin.ifField} {sourceField?.label} = {rule.sourceValue}, {translations.admin.thenLimitField} {targetField?.label} ∈ [{rule.allowedValues.join(', ')}]
                       </p>
                       <button
                         onClick={() => handleDeleteDependency(rule.id)}
                         className="p-2 hover:bg-red-500/20 text-red-400 rounded transition-colors"
+                        title={translations.admin.deleteDependency}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -615,38 +641,38 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
             <div className="space-y-6">
               {/* Password Change */}
               <div className="border-b border-red-900/50 pb-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Change Admin Password</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">{translations.admin.changeAdminPassword}</h3>
                 <div className="space-y-3">
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="New password"
+                    placeholder={translations.admin.newPassword}
                     className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600"
                   />
                   <button
                     onClick={handlePasswordChange}
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
                   >
-                    Update Password
+                    {translations.admin.updatePassword}
                   </button>
                 </div>
               </div>
 
               {/* Import/Export */}
               <div className="border-b border-red-900/50 pb-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Configuration</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">{translations.admin.configuration}</h3>
                 <div className="flex gap-3 flex-wrap">
                   <button
                     onClick={handleExport}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
                   >
                     <Download className="w-4 h-4" />
-                    Export Config
+                    {translations.admin.exportConfig}
                   </button>
                   <label className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors cursor-pointer">
                     <Upload className="w-4 h-4" />
-                    Import Config
+                    {translations.admin.importConfig}
                     <input
                       type="file"
                       accept=".json"
@@ -659,20 +685,20 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
               {/* Dangerous Actions */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Dangerous Actions</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">{translations.admin.dangerousActions}</h3>
                 <button
                   onClick={() => {
-                    if (confirm('Reset to default configuration? This cannot be undone.')) {
+                    if (confirm(translations.admin.resetConfirmation)) {
                       resetConfig();
                       setConfig(loadConfig());
-                      setSuccess('Configuration reset to defaults');
+                      setSuccess(translations.admin.configurationResetToDefaults);
                       setTimeout(() => setSuccess(''), 3000);
                     }
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  Reset to Defaults
+                  {translations.admin.resetToDefaults}
                 </button>
               </div>
             </div>
@@ -685,7 +711,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
             onClick={handleSave}
             className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
           >
-            Save All Changes
+            {translations.admin.saveChanges}
           </button>
         </div>
       </div>

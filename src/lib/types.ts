@@ -6,6 +6,7 @@ export interface UTMField {
   options: string[];      // dropdown values (only for dropdown type)
   order: number;          // display order
   isCustom: boolean;      // true if admin-created
+  description?: string;   // tooltip description shown on hover
 }
 
 export interface DependencyRule {

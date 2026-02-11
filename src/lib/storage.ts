@@ -15,7 +15,9 @@ export function loadConfig(): AppConfig {
     if (parsed.fields) {
       parsed.fields = parsed.fields.map((field: any) => ({
         ...field,
-        fieldType: field.fieldType || 'dropdown'
+        fieldType: field.fieldType || 'dropdown',
+        // Migration: Add description field if it doesn't exist
+        description: field.description !== undefined ? field.description : undefined
       }));
     }
 

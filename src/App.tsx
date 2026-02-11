@@ -4,6 +4,7 @@ import { UserGenerator } from './components/UserGenerator';
 import { AdminPanel } from './components/AdminPanel';
 import { PasswordGuard } from './components/PasswordGuard';
 import { loadConfig } from './lib/storage';
+import { translations } from './lib/translations';
 
 function App() {
   const [page, setPage] = useState<'user' | 'admin'>('user');
@@ -27,7 +28,7 @@ function App() {
               }}
               className="text-gray-400 hover:text-red-500 underline transition-colors"
             >
-              Admin
+              {translations.app.admin}
             </button>
           </footer>
         </>

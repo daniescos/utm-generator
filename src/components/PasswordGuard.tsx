@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Lock, Eye, EyeOff } from 'lucide-react';
+import { translations } from '../lib/translations';
 
 interface PasswordGuardProps {
   correctPassword: string;
@@ -31,8 +32,8 @@ export function PasswordGuard({ correctPassword, onAuthenticated }: PasswordGuar
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-white text-center mb-2">Admin Access</h2>
-          <p className="text-gray-400 text-center mb-6">Enter password to manage UTM settings</p>
+          <h2 className="text-2xl font-bold text-white text-center mb-2">{translations.passwordGuard.title}</h2>
+          <p className="text-gray-400 text-center mb-6">{translations.passwordGuard.subtitle}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
@@ -44,7 +45,7 @@ export function PasswordGuard({ correctPassword, onAuthenticated }: PasswordGuar
                   setPassword(e.target.value);
                   setError('');
                 }}
-                placeholder="Enter password"
+                placeholder={translations.passwordGuard.passwordPlaceholder}
                 className="w-full pl-10 pr-12 py-3 bg-gray-900 border border-red-900/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-500/50 focus:shadow-[0_0_20px_rgba(239,68,68,0.5)] transition-all duration-300"
                 autoFocus
               />
@@ -62,14 +63,14 @@ export function PasswordGuard({ correctPassword, onAuthenticated }: PasswordGuar
             </div>
 
             {error && (
-              <p className="text-red-300 text-sm mt-2">{error}</p>
+              <p className="text-red-300 text-sm mt-2">{translations.passwordGuard.invalidPassword}</p>
             )}
 
             <button
               type="submit"
               className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 hover:shadow-[0_0_20px_rgba(220,38,38,0.5)] focus:outline-none focus:ring-2 focus:ring-red-500/50"
             >
-              Unlock Admin Panel
+              {translations.passwordGuard.unlock}
             </button>
           </form>
         </div>
