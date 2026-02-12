@@ -70,6 +70,27 @@ export const translations = {
     allDependencyFieldsRequired: 'Todos os campos de dependência são obrigatórios',
     dependencyAddedSuccessfully: 'Regra de dependência adicionada com sucesso!',
 
+    // String Constraints
+    selectAllowedValues: 'Selecionar Valores Permitidos',
+    selectedValues: 'Valores selecionados',
+    stringConstraintType: 'Tipo de Restrição',
+    selectConstraintType: 'Selecionar tipo...',
+    matchesPattern: 'Corresponde ao padrão (regex)',
+    contains: 'Contém',
+    startsWith: 'Começa com',
+    endsWith: 'Termina com',
+    exactlyEquals: 'É exatamente',
+    minLength: 'Comprimento mínimo',
+    maxLength: 'Comprimento máximo',
+    caseSensitive: 'Diferenciar maiúsculas/minúsculas',
+    constraintValue: 'Valor da Restrição',
+
+    // Rule Explanation
+    ruleExplanation: 'Explicação da Regra',
+    optional: 'opcional',
+    ruleExplanationPlaceholder: 'ex: Campanhas de email devem seguir nosso padrão de nomenclatura',
+    ruleExplanationHelp: 'Esta mensagem será mostrada aos usuários quando a regra estiver ativa',
+
     // Config Tab
     changeAdminPassword: 'Alterar Senha do Admin',
     newPassword: 'Nova senha',

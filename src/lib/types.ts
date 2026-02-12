@@ -11,10 +11,23 @@ export interface UTMField {
 
 export interface DependencyRule {
   id: string;
-  sourceField: string;    // field ID that triggers rule
+  sourceField: string;    // field ID that triggers rule (must be dropdown)
   sourceValue: string;    // value that triggers rule
   targetField: string;    // field affected by rule
-  allowedValues: string[];// restricted options for target
+  targetFieldType?: 'dropdown' | 'string'; // NEW: target field type
+
+  // Para dropdown targets (existing - backward compatible)
+  allowedValues?: string[];
+
+  // Para string targets (NEW)
+  stringConstraint?: {
+    type: 'pattern' | 'contains' | 'startsWith' | 'endsWith' | 'equals' | 'minLength' | 'maxLength';
+    value: string;
+    caseSensitive?: boolean;
+  };
+
+  // User-facing explanation (NEW)
+  explanation?: string;
 }
 
 export interface AppConfig {

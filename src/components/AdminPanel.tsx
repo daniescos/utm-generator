@@ -159,9 +159,63 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   };
 
   // Dependency Management
+  const getStringConstraintPlaceholder = (type: string): string => {
+    switch (type) {
+      case 'pattern': return 'ex: ^[a-z]+_campaign$';
+      case 'contains': return 'ex: promo';
+      case 'startsWith': return 'ex: email_';
+      case 'endsWith': return 'ex: _2024';
+      case 'equals': return 'ex: special_campaign';
+      case 'minLength': return 'ex: 5';
+      case 'maxLength': return 'ex: 50';
+      default: return '';
+    }
+  };
+
+  const formatRuleDisplay = (rule: DependencyRule): string => {
+    const sourceField = config.fields.find(f => f.id === rule.sourceField);
+    const targetField = config.fields.find(f => f.id === rule.targetField);
+
+    let constraint = '';
+
+    if (rule.targetFieldType === 'dropdown' && rule.allowedValues) {
+      constraint = `∈ [${rule.allowedValues.join(', ')}]`;
+    } else if (rule.targetFieldType === 'string' && rule.stringConstraint) {
+      const sc = rule.stringConstraint;
+      switch (sc.type) {
+        case 'pattern': constraint = `corresponde a "${sc.value}"`; break;
+        case 'contains': constraint = `contém "${sc.value}"`; break;
+        case 'startsWith': constraint = `começa com "${sc.value}"`; break;
+        case 'endsWith': constraint = `termina com "${sc.value}"`; break;
+        case 'equals': constraint = `= "${sc.value}"`; break;
+        case 'minLength': constraint = `comprimento ≥ ${sc.value}`; break;
+        case 'maxLength': constraint = `comprimento ≤ ${sc.value}`; break;
+      }
+    }
+
+    return `${translations.admin.ifField} ${sourceField?.label} = ${rule.sourceValue}, ${translations.admin.thenLimitField} ${targetField?.label} ${constraint}`;
+  };
+
   const handleAddDependency = () => {
-    if (!newDependency.sourceField || !newDependency.sourceValue || !newDependency.targetField || !newDependency.allowedValues?.length) {
+    if (!newDependency.sourceField || !newDependency.sourceValue || !newDependency.targetField) {
       setError(translations.admin.allDependencyFieldsRequired);
+      return;
+    }
+
+    const targetField = config.fields.find(f => f.id === newDependency.targetField);
+    if (!targetField) {
+      setError('Target field not found');
+      return;
+    }
+
+    // Validate based on target field type
+    if (targetField.fieldType === 'dropdown' && !newDependency.allowedValues?.length) {
+      setError('Dropdown dependencies must have at least one allowed value');
+      return;
+    }
+
+    if (targetField.fieldType === 'string' && !newDependency.stringConstraint) {
+      setError('String dependencies must have a constraint');
       return;
     }
 
@@ -170,7 +224,10 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       sourceField: newDependency.sourceField,
       sourceValue: newDependency.sourceValue,
       targetField: newDependency.targetField,
+      targetFieldType: (targetField.fieldType as 'dropdown' | 'string'),
       allowedValues: newDependency.allowedValues,
+      stringConstraint: newDependency.stringConstraint,
+      explanation: newDependency.explanation,
     };
 
     const validation = validateDependency(rule, config);
@@ -589,27 +646,148 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                     <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.thenLimitField}</label>
                     <select
                       value={newDependency.targetField || ''}
-                      onChange={(e) => setNewDependency(prev => ({ ...prev, targetField: e.target.value }))}
+                      onChange={(e) => {
+                        setNewDependency(prev => ({
+                          ...prev,
+                          targetField: e.target.value,
+                          allowedValues: undefined,
+                          stringConstraint: undefined,
+                        }));
+                      }}
                       className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
                     >
                       <option value="">{translations.admin.selectSourceField}</option>
-                      {sortedFields.filter(f => f.fieldType === 'dropdown').map(f => (
+                      {sortedFields.map(f => (
                         <option key={f.id} value={f.id}>{f.label}</option>
                       ))}
                     </select>
                   </div>
 
+                  {newDependency.targetField && (() => {
+                    const targetField = config.fields.find(f => f.id === newDependency.targetField);
+
+                    if (targetField?.fieldType === 'dropdown') {
+                      return (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            {translations.admin.selectAllowedValues}
+                          </label>
+                          <div className="max-h-48 overflow-y-auto border border-red-900/50 rounded p-3 space-y-2 bg-gray-900">
+                            {targetField.options.map(option => (
+                              <label key={option} className="flex items-center gap-2 cursor-pointer hover:bg-gray-800 p-2 rounded">
+                                <input
+                                  type="checkbox"
+                                  checked={(newDependency.allowedValues || []).includes(option)}
+                                  onChange={(e) => {
+                                    const currentValues = newDependency.allowedValues || [];
+                                    setNewDependency(prev => ({
+                                      ...prev,
+                                      allowedValues: e.target.checked
+                                        ? [...currentValues, option]
+                                        : currentValues.filter(v => v !== option)
+                                    }));
+                                  }}
+                                  className="w-4 h-4 accent-red-600"
+                                />
+                                <span className="text-white text-sm">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {translations.admin.selectedValues}: {(newDependency.allowedValues || []).length}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    if (targetField?.fieldType === 'string') {
+                      return (
+                        <div className="space-y-3">
+                          <label className="block text-sm font-medium text-gray-300 mb-1">
+                            {translations.admin.stringConstraintType}
+                          </label>
+                          <select
+                            value={newDependency.stringConstraint?.type || ''}
+                            onChange={(e) => setNewDependency(prev => ({
+                              ...prev,
+                              stringConstraint: {
+                                type: e.target.value as any,
+                                value: prev.stringConstraint?.value || '',
+                                caseSensitive: prev.stringConstraint?.caseSensitive,
+                              }
+                            }))}
+                            className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white"
+                          >
+                            <option value="">{translations.admin.selectConstraintType}</option>
+                            <option value="pattern">{translations.admin.matchesPattern}</option>
+                            <option value="contains">{translations.admin.contains}</option>
+                            <option value="startsWith">{translations.admin.startsWith}</option>
+                            <option value="endsWith">{translations.admin.endsWith}</option>
+                            <option value="equals">{translations.admin.exactlyEquals}</option>
+                            <option value="minLength">{translations.admin.minLength}</option>
+                            <option value="maxLength">{translations.admin.maxLength}</option>
+                          </select>
+
+                          {newDependency.stringConstraint?.type && (
+                            <>
+                              <input
+                                type="text"
+                                value={newDependency.stringConstraint.value}
+                                onChange={(e) => setNewDependency(prev => ({
+                                  ...prev,
+                                  stringConstraint: {
+                                    ...prev.stringConstraint!,
+                                    value: e.target.value,
+                                  }
+                                }))}
+                                placeholder={getStringConstraintPlaceholder(newDependency.stringConstraint.type)}
+                                className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500"
+                              />
+
+                              {['pattern', 'contains', 'startsWith', 'endsWith', 'equals'].includes(newDependency.stringConstraint.type) && (
+                                <label className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={newDependency.stringConstraint.caseSensitive || false}
+                                    onChange={(e) => setNewDependency(prev => ({
+                                      ...prev,
+                                      stringConstraint: {
+                                        ...prev.stringConstraint!,
+                                        caseSensitive: e.target.checked,
+                                      }
+                                    }))}
+                                    className="w-4 h-4 accent-red-600"
+                                  />
+                                  <span className="text-sm text-gray-300">{translations.admin.caseSensitive}</span>
+                                </label>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
+
                   {newDependency.targetField && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.toTheseValues}</label>
-                      <textarea
-                        value={(newDependency.allowedValues || []).join('\n')}
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        {translations.admin.ruleExplanation} <span className="text-gray-500">({translations.admin.optional})</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newDependency.explanation || ''}
                         onChange={(e) => setNewDependency(prev => ({
                           ...prev,
-                          allowedValues: e.target.value.split('\n').map(v => v.trim()).filter(Boolean)
+                          explanation: e.target.value,
                         }))}
-                        className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500 focus:outline-none focus:border-red-600 font-mono text-sm h-24"
+                        placeholder={translations.admin.ruleExplanationPlaceholder}
+                        className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500"
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {translations.admin.ruleExplanationHelp}
+                      </p>
                     </div>
                   )}
 
@@ -632,16 +810,21 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
               <div className="space-y-2">
                 {config.dependencies.map(rule => {
-                  const sourceField = config.fields.find(f => f.id === rule.sourceField);
-                  const targetField = config.fields.find(f => f.id === rule.targetField);
                   return (
                     <div key={rule.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
-                      <p className="text-sm text-gray-300">
-                        {translations.admin.ifField} {sourceField?.label} = {rule.sourceValue}, {translations.admin.thenLimitField} {targetField?.label} ∈ [{rule.allowedValues.join(', ')}]
-                      </p>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-300">
+                          {formatRuleDisplay(rule)}
+                        </p>
+                        {rule.explanation && (
+                          <p className="text-xs text-gray-400 mt-1 italic">
+                            "{rule.explanation}"
+                          </p>
+                        )}
+                      </div>
                       <button
                         onClick={() => handleDeleteDependency(rule.id)}
-                        className="p-2 hover:bg-red-500/20 text-red-400 rounded transition-colors"
+                        className="p-2 hover:bg-red-500/20 text-red-400 rounded transition-colors ml-3"
                         title={translations.admin.deleteDependency}
                       >
                         <Trash2 className="w-4 h-4" />

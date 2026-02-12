@@ -3,6 +3,25 @@ import { DEFAULT_CONFIG } from './types';
 
 const CONFIG_KEY = 'utm_generator_config';
 
+// Migrate dependency rules to support new constraint types
+function migrateDependencyRules(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    dependencies: config.dependencies.map(rule => {
+      // If targetFieldType doesn't exist, it's an old rule (dropdown → dropdown only)
+      if (!rule.targetFieldType) {
+        const targetField = config.fields.find(f => f.id === rule.targetField);
+        const fieldType = targetField?.fieldType || 'dropdown';
+        return {
+          ...rule,
+          targetFieldType: (fieldType === 'string' ? 'string' : 'dropdown') as 'dropdown' | 'string',
+        };
+      }
+      return rule;
+    }),
+  };
+}
+
 // Load global config from public/config.json
 async function loadGlobalConfig(): Promise<AppConfig | null> {
   try {
@@ -35,7 +54,7 @@ export function loadConfig(): AppConfig {
     // First, check localStorage
     const stored = localStorage.getItem(CONFIG_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored);
+      let parsed = JSON.parse(stored);
       // Migration: Add fieldType to fields without it
       if (parsed.fields) {
         parsed.fields = parsed.fields.map((field: any) => ({
@@ -44,6 +63,8 @@ export function loadConfig(): AppConfig {
           description: field.description !== undefined ? field.description : undefined
         }));
       }
+      // Migration: Add targetFieldType to dependency rules
+      parsed = migrateDependencyRules(parsed);
       return parsed;
     }
     return DEFAULT_CONFIG;
@@ -70,8 +91,11 @@ export function getStoredConfigVersion(): number {
 // Async version: Load from global config, using localStorage only if version matches
 export async function loadConfigAsync(): Promise<AppConfig> {
   // Try to load global config first
-  const globalConfig = await loadGlobalConfig();
+  let globalConfig = await loadGlobalConfig();
   if (globalConfig) {
+    // Migration: Add targetFieldType to dependency rules
+    globalConfig = migrateDependencyRules(globalConfig);
+
     // Check localStorage version vs global version
     const storedVersion = getStoredConfigVersion();
 
@@ -80,7 +104,9 @@ export async function loadConfigAsync(): Promise<AppConfig> {
       const stored = localStorage.getItem(CONFIG_KEY);
       if (stored) {
         try {
-          return JSON.parse(stored);
+          let parsedConfig = JSON.parse(stored);
+          parsedConfig = migrateDependencyRules(parsedConfig);
+          return parsedConfig;
         } catch {
           return globalConfig;
         }
@@ -110,7 +136,7 @@ export function exportConfig(): string {
 
 export function importConfig(jsonString: string): AppConfig {
   try {
-    const parsed = JSON.parse(jsonString);
+    let parsed = JSON.parse(jsonString);
     // Validate basic structure
     if (!parsed.fields || !Array.isArray(parsed.fields)) {
       throw new Error('Invalid config format: missing fields array');
@@ -127,6 +153,9 @@ export function importConfig(jsonString: string): AppConfig {
       ...field,
       fieldType: field.fieldType || 'dropdown'
     }));
+
+    // Migration: Add targetFieldType to dependency rules
+    parsed = migrateDependencyRules(parsed);
 
     return parsed;
   } catch (error) {

@@ -1,19 +1,29 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Copy, Check, Info } from 'lucide-react';
+import { Copy, Check, Info, AlertCircle } from 'lucide-react';
 import { loadConfigAsync, loadConfig } from '../lib/storage';
-import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard } from '../lib/utils';
+import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard, getApplicableDependencyRules, validateStringAgainstRules } from '../lib/utils';
 import { translations } from '../lib/translations';
 import { Tooltip } from './Tooltip';
+import { RuleIndicator } from './RuleIndicator';
 
 export function UserGenerator() {
   const [config, setConfig] = useState(loadConfig());
   const [baseUrl, setBaseUrl] = useState('');
   const [selectedValues, setSelectedValues] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [validationTimeouts, setValidationTimeouts] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     loadConfigAsync().then(setConfig);
   }, []);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(validationTimeouts).forEach(timeout => clearTimeout(timeout));
+    };
+  }, [validationTimeouts]);
 
   const sortedFields = useMemo(() => {
     return [...config.fields].sort((a, b) => a.order - b.order);
@@ -31,10 +41,42 @@ export function UserGenerator() {
   };
 
   const handleFieldChange = (fieldId: string, value: string) => {
+    const field = config.fields.find(f => f.id === fieldId);
+    if (!field) return;
+
+    // Update value immediately
     setSelectedValues(prev => ({
       ...prev,
       [fieldId]: value,
     }));
+
+    // Clear previous error
+    setFieldErrors(prev => ({ ...prev, [fieldId]: '' }));
+
+    // Validate string fields with rules in real-time
+    if (field.fieldType === 'string' && value) {
+      // Cancel previous timeout if it exists
+      if (validationTimeouts[fieldId]) {
+        clearTimeout(validationTimeouts[fieldId]);
+      }
+
+      // Create new timeout to validate after 300ms of inactivity
+      const timeoutId = setTimeout(() => {
+        const applicableRules = getApplicableDependencyRules(fieldId, { ...selectedValues, [fieldId]: value }, config);
+
+        if (applicableRules.length > 0) {
+          const validation = validateStringAgainstRules(value, applicableRules);
+          if (!validation.valid) {
+            setFieldErrors(prev => ({
+              ...prev,
+              [fieldId]: validation.error || 'Valor inválido',
+            }));
+          }
+        }
+      }, 300);
+
+      setValidationTimeouts(prev => ({ ...prev, [fieldId]: timeoutId }));
+    }
   };
 
   return (
@@ -75,6 +117,12 @@ export function UserGenerator() {
                     selectedValues,
                     config
                   );
+                  const applicableRules = getApplicableDependencyRules(
+                    field.id,
+                    selectedValues,
+                    config
+                  );
+                  const hasActiveRules = applicableRules.length > 0;
 
                   return (
                     <div key={field.id}>
@@ -88,30 +136,70 @@ export function UserGenerator() {
                       </label>
 
                       {field.fieldType === 'dropdown' && (
-                        <select
-                          id={field.id}
-                          value={selectedValues[field.id] || ''}
-                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                          className="w-full px-4 py-2 bg-gray-900 border border-red-900/50 rounded-lg text-white focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-500/50 transition-all duration-300"
-                        >
-                          <option value="">{translations.generator.selectFieldPlaceholder(field.label)}</option>
-                          {availableOptions.map(option => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            id={field.id}
+                            value={selectedValues[field.id] || ''}
+                            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                            className={`w-full px-4 py-2 bg-gray-900 border rounded-lg text-white focus:outline-none focus:ring-2 transition-all duration-300 ${
+                              hasActiveRules
+                                ? 'border-yellow-500/50 focus:border-yellow-600 focus:ring-yellow-500/50'
+                                : 'border-red-900/50 focus:border-red-600 focus:ring-red-500/50'
+                            }`}
+                          >
+                            <option value="">{translations.generator.selectFieldPlaceholder(field.label)}</option>
+                            {availableOptions.map(option => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                          {hasActiveRules && applicableRules.map(rule => {
+                            const sourceField = config.fields.find(f => f.id === rule.sourceField);
+                            return (
+                              <RuleIndicator
+                                key={rule.id}
+                                rule={rule}
+                                sourceFieldLabel={sourceField?.label || ''}
+                              />
+                            );
+                          })}
+                        </>
                       )}
 
                       {field.fieldType === 'string' && (
-                        <input
-                          type="text"
-                          id={field.id}
-                          value={selectedValues[field.id] || ''}
-                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                          placeholder={translations.generator.enterFieldPlaceholder(field.label)}
-                          className="w-full px-4 py-2 bg-gray-900 border border-red-900/50 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-500/50 transition-all duration-300"
-                        />
+                        <>
+                          <input
+                            type="text"
+                            id={field.id}
+                            value={selectedValues[field.id] || ''}
+                            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                            placeholder={translations.generator.enterFieldPlaceholder(field.label)}
+                            className={`w-full px-4 py-2 bg-gray-900 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-300 ${
+                              fieldErrors[field.id]
+                                ? 'border-red-500/50 focus:border-red-600 focus:ring-red-500/50'
+                                : hasActiveRules
+                                ? 'border-yellow-500/50 focus:border-yellow-600 focus:ring-yellow-500/50'
+                                : 'border-red-900/50 focus:border-red-600 focus:ring-red-500/50'
+                            }`}
+                          />
+                          {fieldErrors[field.id] && (
+                            <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              {fieldErrors[field.id]}
+                            </p>
+                          )}
+                          {hasActiveRules && !fieldErrors[field.id] && applicableRules.map(rule => {
+                            const sourceField = config.fields.find(f => f.id === rule.sourceField);
+                            return (
+                              <RuleIndicator
+                                key={rule.id}
+                                rule={rule}
+                                sourceFieldLabel={sourceField?.label || ''}
+                              />
+                            );
+                          })}
+                        </>
                       )}
 
                       {field.fieldType === 'integer' && (
