@@ -4,6 +4,7 @@ import { loadConfig, loadConfigAsync, saveConfig, exportConfig, importConfig, re
 import type { AppConfig, UTMField, DependencyRule, RuleType } from '../lib/types';
 import { generateId, validateDependency } from '../lib/utils';
 import { translations } from '../lib/translations';
+import { DependencyForm } from './DependencyForm';
 
 interface AdminPanelProps {
   onLogout: () => void;
@@ -23,10 +24,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [newFieldType, setNewFieldType] = useState<'dropdown' | 'string' | 'integer'>('dropdown');
   const [selectedFieldForOptions, setSelectedFieldForOptions] = useState<string | null>(null);
   const [fieldOptionsText, setFieldOptionsText] = useState('');
-  const [newDependency, setNewDependency] = useState<Partial<DependencyRule>>({ ruleType: 'filter' });
   const [showDependencyForm, setShowDependencyForm] = useState(false);
-  const [dependencyPriority, setDependencyPriority] = useState<number>(50);
-  const [dependencySourceCondition, setDependencySourceCondition] = useState<'equals' | 'not_equals' | 'in' | 'not_in'>('equals');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
@@ -229,89 +227,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     return description;
   };
 
-  const handleAddDependency = () => {
-    if (!newDependency.sourceField || !newDependency.sourceValue || !newDependency.targetField) {
-      setError(translations.admin.allDependencyFieldsRequired);
-      return;
-    }
-
-    const ruleType = (newDependency.ruleType || 'filter') as RuleType;
-    const targetField = config.fields.find(f => f.id === newDependency.targetField);
-    if (!targetField) {
-      setError('Target field not found');
-      return;
-    }
-
-    // Type-specific validations
-    switch (ruleType) {
-      case 'filter':
-      case 'validation':
-        if (targetField.fieldType === 'dropdown' && !newDependency.allowedValues?.length) {
-          setError('Dropdown dependencies must have at least one allowed value');
-          return;
-        }
-        if (targetField.fieldType === 'string' && !newDependency.stringConstraint) {
-          setError('String dependencies must have a constraint');
-          return;
-        }
-        break;
-
-      case 'transform':
-        if (!newDependency.transformTo) {
-          setError('Transform rule must have target type configured');
-          return;
-        }
-        break;
-
-      case 'visibility':
-        if (!newDependency.visibilityAction) {
-          setError('Visibility rule must have action (show/hide)');
-          return;
-        }
-        break;
-
-      case 'required':
-        if (!newDependency.requiredAction) {
-          setError('Required rule must have action (make_required/make_optional)');
-          return;
-        }
-        break;
-
-      case 'autofill':
-        if (!newDependency.autofillValue) {
-          setError('Autofill rule must have a value');
-          return;
-        }
-        break;
-
-      case 'cross_validation':
-        if (!newDependency.crossValidation) {
-          setError('Cross-validation rule must have configuration');
-          return;
-        }
-        break;
-    }
-
-    const rule: DependencyRule = {
-      id: generateId(),
-      ruleType,
-      priority: dependencyPriority,
-      sourceField: newDependency.sourceField,
-      sourceValue: newDependency.sourceValue,
-      sourceCondition: dependencySourceCondition,
-      targetField: newDependency.targetField,
-      targetFieldType: (targetField.fieldType as 'dropdown' | 'string'),
-      allowedValues: newDependency.allowedValues,
-      stringConstraint: newDependency.stringConstraint,
-      transformTo: newDependency.transformTo,
-      visibilityAction: newDependency.visibilityAction,
-      requiredAction: newDependency.requiredAction,
-      autofillValue: newDependency.autofillValue,
-      autofillAllowOverride: newDependency.autofillAllowOverride,
-      crossValidation: newDependency.crossValidation,
-      explanation: newDependency.explanation,
-    };
-
+  const handleAddDependency = (rule: DependencyRule) => {
     const validation = validateDependency(rule, config);
     if (!validation.valid) {
       setError(validation.error || 'Invalid dependency');
@@ -323,9 +239,6 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       dependencies: [...prev.dependencies, rule],
     }));
 
-    setNewDependency({ ruleType: 'filter' });
-    setDependencyPriority(50);
-    setDependencySourceCondition('equals');
     setShowDependencyForm(false);
     setError('');
     setSuccess(translations.admin.dependencyAddedSuccessfully);
@@ -695,7 +608,16 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
               </button>
 
               {showDependencyForm && (
-                <div className="border border-red-900/50 rounded-lg p-4 space-y-3">
+                <DependencyForm
+                  config={config}
+                  sortedFields={sortedFields}
+                  onAddRule={handleAddDependency}
+                  onError={setError}
+                />
+              )}
+
+              {!showDependencyForm && (
+                <div className="border border-red-900/50 rounded-lg p-4 space-y-3 hidden">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.ifField}</label>
                     <select
