@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "adminPassword": "admin123",
   "fields": [
     {
@@ -95,5 +95,26 @@
       "isCustom": true
     }
   ],
-  "dependencies": []
+  "dependencies": [
+    {
+      "id": "jb-campaign-transform",
+      "ruleType": "transform",
+      "priority": 100,
+      "sourceField": "medium",
+      "sourceValue": "journey_builder",
+      "sourceCondition": "equals",
+      "targetField": "campaign",
+      "targetFieldType": "dropdown",
+      "transformTo": {
+        "fieldType": "string",
+        "stringConstraint": {
+          "type": "pattern",
+          "value": "^[a-z0-9_]+$",
+          "caseSensitive": false
+        },
+        "clearValueOnTransform": true
+      },
+      "explanation": "Campanhas do Journey Builder usam nomenclatura livre em lowercase com underscore"
+    }
+  ]
 }
