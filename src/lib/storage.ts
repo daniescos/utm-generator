@@ -3,8 +3,8 @@ import { DEFAULT_CONFIG } from './types';
 
 const CONFIG_KEY = 'utm_generator_config';
 
-// Migrate dependency rules to support new constraint types
-function migrateDependencyRules(config: AppConfig): AppConfig {
+// Migrate V1 rules: Add targetFieldType if missing
+function migrateV1(config: AppConfig): AppConfig {
   return {
     ...config,
     dependencies: config.dependencies.map(rule => {
@@ -20,6 +20,52 @@ function migrateDependencyRules(config: AppConfig): AppConfig {
       return rule;
     }),
   };
+}
+
+// Migrate V2 rules: Add ruleType if missing
+function migrateV2(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    version: 2,
+    dependencies: config.dependencies.map((rule: any) => {
+      // If ruleType exists, it's already migrated
+      if (rule.ruleType) return rule;
+
+      // Detect rule type based on existing structure
+      let ruleType: string;
+      if (rule.targetFieldType === 'string' && rule.stringConstraint) {
+        ruleType = 'validation';
+      } else if (rule.allowedValues) {
+        ruleType = 'filter';
+      } else {
+        ruleType = 'filter'; // Default
+      }
+
+      return {
+        ...rule,
+        ruleType,
+        sourceCondition: rule.sourceCondition || 'equals',
+        priority: rule.priority !== undefined ? rule.priority : 50,
+      };
+    }),
+  };
+}
+
+// Migrate dependency rules through all versions
+function migrateDependencyRules(config: AppConfig): AppConfig {
+  let migrated = config;
+
+  // V1 migration: Add targetFieldType
+  if (!config.version || config.version < 1) {
+    migrated = migrateV1(migrated);
+  }
+
+  // V2 migration: Add ruleType
+  if (!config.version || config.version < 2) {
+    migrated = migrateV2(migrated);
+  }
+
+  return migrated;
 }
 
 // Load global config from public/config.json

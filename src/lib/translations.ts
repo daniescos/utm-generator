@@ -70,6 +70,65 @@ export const translations = {
     allDependencyFieldsRequired: 'Todos os campos de dependência são obrigatórios',
     dependencyAddedSuccessfully: 'Regra de dependência adicionada com sucesso!',
 
+    // Rule Types
+    selectRuleType: 'Selecione o tipo de regra',
+    ruleType: 'Tipo de Regra',
+    ruleTypes: {
+      filter: 'Filtrar Opções (Dropdown)',
+      validation: 'Validar String',
+      transform: 'Transformar Tipo de Campo',
+      visibility: 'Mostrar/Ocultar Campo',
+      required: 'Campo Obrigatório',
+      autofill: 'Preencher Automaticamente',
+      cross_validation: 'Validação Cruzada',
+    },
+
+    // Rule Type Descriptions
+    ruleTypeDescriptions: {
+      filter: 'Restringe opções disponíveis em dropdown baseado em seleção',
+      validation: 'Valida entrada de string contra restrições (padrão, comprimento, etc)',
+      transform: 'Transforma dinamicamente o tipo de campo (dropdown ↔ string)',
+      visibility: 'Mostra ou oculta campo baseado em condição',
+      required: 'Torna campo obrigatório ou opcional condicionalmente',
+      autofill: 'Preenche automaticamente campo com valor sugerido',
+      cross_validation: 'Valida relacionamento entre múltiplos campos',
+    },
+
+    // Rule Configuration
+    priority: 'Prioridade',
+    priorityHelp: 'Maior prioridade = aplicada primeiro (0-100)',
+    sourceCondition: 'Tipo de Condição',
+    sourceConditionTypes: {
+      equals: 'Igual a',
+      not_equals: 'Diferente de',
+      in: 'Um de',
+      not_in: 'Nenhum de',
+    },
+
+    // Transform Configuration
+    transformFieldType: 'Transformar campo para tipo',
+    clearValueOnTransform: 'Limpar valor ao transformar',
+    addValidationToString: 'Adicionar validação de string? (opcional)',
+
+    // Visibility Configuration
+    visibilityAction: 'Ação',
+    hideField: 'Ocultar campo',
+    showField: 'Mostrar campo',
+
+    // Required Configuration
+    requiredAction: 'Ação',
+    makeRequired: 'Tornar obrigatório',
+    makeOptional: 'Tornar opcional',
+
+    // Autofill Configuration
+    autofillValueLabel: 'Valor para preencher',
+    allowUserToOverride: 'Permitir que usuário altere o valor',
+
+    // Cross-validation Configuration
+    validationRuleDescription: 'Descrição da regra',
+    allowedCombinations: 'Combinações permitidas',
+    addCombination: 'Adicionar combinação',
+
     // String Constraints
     selectAllowedValues: 'Selecionar Valores Permitidos',
     selectedValues: 'Valores selecionados',

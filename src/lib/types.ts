@@ -9,25 +9,87 @@ export interface UTMField {
   description?: string;   // tooltip description shown on hover
 }
 
+export type RuleType =
+  | 'filter'              // Existing: restrict dropdown options
+  | 'validation'          // Existing: validate string fields
+  | 'transform'           // NEW: change field type dynamically
+  | 'visibility'          // NEW: show/hide fields
+  | 'required'            // NEW: make fields required/optional
+  | 'autofill'            // NEW: automatically populate field values
+  | 'cross_validation';   // NEW: validate relationships between fields
+
+export type SourceCondition = 'equals' | 'not_equals' | 'in' | 'not_in';
+
+export interface StringConstraint {
+  type: 'pattern' | 'contains' | 'startsWith' | 'endsWith' | 'equals' | 'minLength' | 'maxLength';
+  value: string;
+  caseSensitive?: boolean;
+}
+
+export interface TransformRuleConfig {
+  fieldType: 'dropdown' | 'string';
+  dropdownOptions?: string[];
+  stringConstraint?: StringConstraint;
+  clearValueOnTransform?: boolean;
+}
+
+export interface CrossValidationConfig {
+  validationRule: string;
+  allowedCombinations?: Array<{
+    targetValue: string;
+    targetValue2?: string;
+  }>;
+}
+
 export interface DependencyRule {
   id: string;
-  sourceField: string;    // field ID that triggers rule (must be dropdown)
-  sourceValue: string;    // value that triggers rule
-  targetField: string;    // field affected by rule
-  targetFieldType?: 'dropdown' | 'string'; // NEW: target field type
+  ruleType: RuleType;                    // NEW: discriminator for rule type
+  priority?: number;                     // NEW: for conflict resolution (higher = first)
 
-  // Para dropdown targets (existing - backward compatible)
+  // Source condition
+  sourceField: string;                   // field ID that triggers rule
+  sourceValue: string;                   // value that triggers rule
+  sourceCondition?: SourceCondition;     // NEW: condition type (default: 'equals')
+  sourceValues?: string[];               // NEW: for 'in'/'not_in' conditions
+
+  // Target configuration
+  targetField: string;                   // field affected by rule
+  targetFieldType?: 'dropdown' | 'string';
+
+  // EXISTING: Dropdown filtering (ruleType: 'filter')
   allowedValues?: string[];
 
-  // Para string targets (NEW)
-  stringConstraint?: {
-    type: 'pattern' | 'contains' | 'startsWith' | 'endsWith' | 'equals' | 'minLength' | 'maxLength';
-    value: string;
-    caseSensitive?: boolean;
-  };
+  // EXISTING: String validation (ruleType: 'validation')
+  stringConstraint?: StringConstraint;
 
-  // User-facing explanation (NEW)
+  // NEW: Transform configuration (ruleType: 'transform')
+  transformTo?: TransformRuleConfig;
+
+  // NEW: Visibility configuration (ruleType: 'visibility')
+  visibilityAction?: 'show' | 'hide';
+
+  // NEW: Required field configuration (ruleType: 'required')
+  requiredAction?: 'make_required' | 'make_optional';
+
+  // NEW: Autofill configuration (ruleType: 'autofill')
+  autofillValue?: string;
+  autofillAllowOverride?: boolean;
+
+  // NEW: Cross-field validation (ruleType: 'cross_validation')
+  crossValidation?: CrossValidationConfig;
+
+  // User-facing explanation
   explanation?: string;
+}
+
+export interface UTMFieldState {
+  fieldId: string;
+  originalFieldType: 'dropdown' | 'string' | 'integer';
+  currentFieldType: 'dropdown' | 'string' | 'integer';
+  isVisible: boolean;
+  isRequired: boolean;
+  appliedRules: string[];
+  hasConflict: boolean;
 }
 
 export interface AppConfig {
@@ -38,7 +100,7 @@ export interface AppConfig {
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  version: 1,
+  version: 2,
   adminPassword: "admin123",
   fields: [
     {
@@ -55,7 +117,7 @@ export const DEFAULT_CONFIG: AppConfig = {
       name: "utm_medium",
       label: "Medium",
       fieldType: "dropdown",
-      options: ["cpc", "social", "email", "organic"],
+      options: ["cpc", "social", "email", "organic", "journey_builder"],
       order: 2,
       isCustom: false,
     },

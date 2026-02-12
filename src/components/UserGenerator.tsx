@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Copy, Check, Info, AlertCircle } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Copy, Check, Info, AlertCircle, AlertTriangle } from 'lucide-react';
 import { loadConfigAsync, loadConfig } from '../lib/storage';
-import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard, getApplicableDependencyRules, validateStringAgainstRules } from '../lib/utils';
+import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard, getApplicableDependencyRules, validateStringAgainstRules, getActiveRules, computeFieldStates, validateCrossField } from '../lib/utils';
 import { translations } from '../lib/translations';
+import type { UTMFieldState } from '../lib/types';
 import { Tooltip } from './Tooltip';
 import { RuleIndicator } from './RuleIndicator';
 
@@ -13,6 +14,7 @@ export function UserGenerator() {
   const [copied, setCopied] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [validationTimeouts, setValidationTimeouts] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [fieldStates, setFieldStates] = useState<Record<string, UTMFieldState>>({});
 
   useEffect(() => {
     loadConfigAsync().then(setConfig);
@@ -24,6 +26,84 @@ export function UserGenerator() {
       Object.values(validationTimeouts).forEach(timeout => clearTimeout(timeout));
     };
   }, [validationTimeouts]);
+
+  // Compute field states based on active rules
+  const newFieldStates = useMemo(() => {
+    return computeFieldStates(selectedValues, config);
+  }, [selectedValues, config]);
+
+  // Handle field state changes (side effects)
+  useEffect(() => {
+    const oldStates = fieldStates;
+    const newStates = newFieldStates;
+
+    for (const fieldId in newStates) {
+      const oldState = oldStates[fieldId];
+      const newState = newStates[fieldId];
+
+      // Clear value if field becomes hidden
+      if (oldState?.isVisible && !newState.isVisible) {
+        setSelectedValues(prev => ({ ...prev, [fieldId]: '' }));
+      }
+
+      // Handle field type transformation
+      if (oldState?.currentFieldType !== newState.currentFieldType) {
+        const activeRules = getActiveRules(selectedValues, config);
+        const transformRule = activeRules.get(fieldId)?.find(r => r.ruleType === 'transform');
+
+        if (transformRule?.transformTo?.clearValueOnTransform) {
+          setSelectedValues(prev => ({ ...prev, [fieldId]: '' }));
+        }
+      }
+
+      // Apply autofill if rule becomes active
+      const newAutofillRule = newStates[fieldId]?.appliedRules
+        .map(ruleId => config.dependencies.find(r => r.id === ruleId))
+        .find(r => r?.ruleType === 'autofill');
+
+      if (newAutofillRule && !selectedValues[fieldId]) {
+        setSelectedValues(prev => ({
+          ...prev,
+          [fieldId]: newAutofillRule.autofillValue || ''
+        }));
+      }
+    }
+
+    setFieldStates(newStates);
+  }, [newFieldStates]);
+
+  // Check if URL can be generated (validation)
+  const canGenerate = useMemo(() => {
+    // Check all required fields are filled
+    for (const field of config.fields) {
+      const state = fieldStates[field.id];
+      if (state?.isRequired && !selectedValues[field.id]) {
+        return false;
+      }
+    }
+
+    // Check cross-validation rules
+    const activeRules = getActiveRules(selectedValues, config);
+    for (const [fieldId, rules] of activeRules) {
+      for (const rule of rules) {
+        if (rule.ruleType === 'cross_validation') {
+          const validation = validateCrossField(rule, selectedValues);
+          if (!validation.valid) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check all string validations pass
+    for (const fieldId in fieldErrors) {
+      if (fieldErrors[fieldId]) {
+        return false;
+      }
+    }
+
+    return true;
+  }, [config, fieldStates, selectedValues, fieldErrors]);
 
   const sortedFields = useMemo(() => {
     return [...config.fields].sort((a, b) => a.order - b.order);
@@ -112,6 +192,13 @@ export function UserGenerator() {
               </label>
               <div className="space-y-3">
                 {sortedFields.map(field => {
+                  const state = fieldStates[field.id];
+
+                  // Skip hidden fields entirely
+                  if (!state?.isVisible) {
+                    return null;
+                  }
+
                   const availableOptions = getAvailableOptionsForField(
                     field.id,
                     selectedValues,
@@ -123,11 +210,18 @@ export function UserGenerator() {
                     config
                   );
                   const hasActiveRules = applicableRules.length > 0;
+                  const effectiveFieldType = state.currentFieldType;
 
                   return (
                     <div key={field.id}>
                       <label htmlFor={field.id} className="block text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
                         {field.label}
+                        {state?.isRequired && <span className="text-red-500">*</span>}
+                        {state?.hasConflict && (
+                          <Tooltip content="Múltiplas regras conflitantes detectadas">
+                            <AlertTriangle className="w-4 h-4 text-orange-500" />
+                          </Tooltip>
+                        )}
                         {field.description && (
                           <Tooltip content={field.description}>
                             <Info className="w-4 h-4 text-gray-500 hover:text-gray-300 transition-colors cursor-help" />
@@ -135,7 +229,7 @@ export function UserGenerator() {
                         )}
                       </label>
 
-                      {field.fieldType === 'dropdown' && (
+                      {effectiveFieldType === 'dropdown' && (
                         <>
                           <select
                             id={field.id}
@@ -167,7 +261,7 @@ export function UserGenerator() {
                         </>
                       )}
 
-                      {field.fieldType === 'string' && (
+                      {effectiveFieldType === 'string' && (
                         <>
                           <input
                             type="text"
@@ -202,7 +296,7 @@ export function UserGenerator() {
                         </>
                       )}
 
-                      {field.fieldType === 'integer' && (
+                      {effectiveFieldType === 'integer' && (
                         <input
                           type="number"
                           id={field.id}
@@ -233,14 +327,18 @@ export function UserGenerator() {
                 />
                 <button
                   onClick={handleCopy}
-                  disabled={!generatedUrl}
+                  disabled={!generatedUrl || !canGenerate}
                   className="px-4 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2"
+                  title={!canGenerate ? 'Preencha todos os campos obrigatórios' : ''}
                 >
                   {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                 </button>
               </div>
               {copied && (
                 <p className="text-green-400 text-sm mt-2">{translations.generator.copiedMessage}</p>
+              )}
+              {!canGenerate && generatedUrl && (
+                <p className="text-orange-400 text-xs mt-2">Resolva as validações de regras antes de copiar</p>
               )}
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Trash2, Download, Upload, RotateCcw, Lock, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Download, Upload, RotateCcw, Lock, Edit2, AlertCircle } from 'lucide-react';
 import { loadConfig, loadConfigAsync, saveConfig, exportConfig, importConfig, resetConfig } from '../lib/storage';
-import type { AppConfig, UTMField, DependencyRule } from '../lib/types';
+import type { AppConfig, UTMField, DependencyRule, RuleType } from '../lib/types';
 import { generateId, validateDependency } from '../lib/utils';
 import { translations } from '../lib/translations';
 
@@ -23,8 +23,10 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [newFieldType, setNewFieldType] = useState<'dropdown' | 'string' | 'integer'>('dropdown');
   const [selectedFieldForOptions, setSelectedFieldForOptions] = useState<string | null>(null);
   const [fieldOptionsText, setFieldOptionsText] = useState('');
-  const [newDependency, setNewDependency] = useState<Partial<DependencyRule>>({});
+  const [newDependency, setNewDependency] = useState<Partial<DependencyRule>>({ ruleType: 'filter' });
   const [showDependencyForm, setShowDependencyForm] = useState(false);
+  const [dependencyPriority, setDependencyPriority] = useState<number>(50);
+  const [dependencySourceCondition, setDependencySourceCondition] = useState<'equals' | 'not_equals' | 'in' | 'not_in'>('equals');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
@@ -175,25 +177,56 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const formatRuleDisplay = (rule: DependencyRule): string => {
     const sourceField = config.fields.find(f => f.id === rule.sourceField);
     const targetField = config.fields.find(f => f.id === rule.targetField);
+    const ruleType = rule.ruleType || 'filter';
 
-    let constraint = '';
+    let description = '';
 
-    if (rule.targetFieldType === 'dropdown' && rule.allowedValues) {
-      constraint = `∈ [${rule.allowedValues.join(', ')}]`;
-    } else if (rule.targetFieldType === 'string' && rule.stringConstraint) {
-      const sc = rule.stringConstraint;
-      switch (sc.type) {
-        case 'pattern': constraint = `corresponde a "${sc.value}"`; break;
-        case 'contains': constraint = `contém "${sc.value}"`; break;
-        case 'startsWith': constraint = `começa com "${sc.value}"`; break;
-        case 'endsWith': constraint = `termina com "${sc.value}"`; break;
-        case 'equals': constraint = `= "${sc.value}"`; break;
-        case 'minLength': constraint = `comprimento ≥ ${sc.value}`; break;
-        case 'maxLength': constraint = `comprimento ≤ ${sc.value}`; break;
-      }
+    switch (ruleType) {
+      case 'filter':
+      case 'validation':
+        let constraint = '';
+        if (rule.targetFieldType === 'dropdown' && rule.allowedValues) {
+          constraint = `∈ [${rule.allowedValues.join(', ')}]`;
+        } else if (rule.targetFieldType === 'string' && rule.stringConstraint) {
+          const sc = rule.stringConstraint;
+          switch (sc.type) {
+            case 'pattern': constraint = `corresponde a "${sc.value}"`; break;
+            case 'contains': constraint = `contém "${sc.value}"`; break;
+            case 'startsWith': constraint = `começa com "${sc.value}"`; break;
+            case 'endsWith': constraint = `termina com "${sc.value}"`; break;
+            case 'equals': constraint = `= "${sc.value}"`; break;
+            case 'minLength': constraint = `comprimento ≥ ${sc.value}`; break;
+            case 'maxLength': constraint = `comprimento ≤ ${sc.value}`; break;
+          }
+        }
+        description = `Se ${sourceField?.label} = ${rule.sourceValue}, então ${targetField?.label} ${constraint}`;
+        break;
+
+      case 'transform':
+        description = `Se ${sourceField?.label} = ${rule.sourceValue}, transforma ${targetField?.label} para ${rule.transformTo?.fieldType}`;
+        break;
+
+      case 'visibility':
+        description = `Se ${sourceField?.label} = ${rule.sourceValue}, ${rule.visibilityAction === 'hide' ? 'oculta' : 'mostra'} ${targetField?.label}`;
+        break;
+
+      case 'required':
+        description = `Se ${sourceField?.label} = ${rule.sourceValue}, torna ${targetField?.label} ${rule.requiredAction === 'make_required' ? 'obrigatório' : 'opcional'}`;
+        break;
+
+      case 'autofill':
+        description = `Se ${sourceField?.label} = ${rule.sourceValue}, preenche ${targetField?.label} com "${rule.autofillValue}"`;
+        break;
+
+      case 'cross_validation':
+        description = `Se ${sourceField?.label} = ${rule.sourceValue}, ${rule.crossValidation?.validationRule || targetField?.label + ' deve ter valor específico'}`;
+        break;
+
+      default:
+        description = `Regra de tipo desconhecido`;
     }
 
-    return `${translations.admin.ifField} ${sourceField?.label} = ${rule.sourceValue}, ${translations.admin.thenLimitField} ${targetField?.label} ${constraint}`;
+    return description;
   };
 
   const handleAddDependency = () => {
@@ -202,31 +235,80 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       return;
     }
 
+    const ruleType = (newDependency.ruleType || 'filter') as RuleType;
     const targetField = config.fields.find(f => f.id === newDependency.targetField);
     if (!targetField) {
       setError('Target field not found');
       return;
     }
 
-    // Validate based on target field type
-    if (targetField.fieldType === 'dropdown' && !newDependency.allowedValues?.length) {
-      setError('Dropdown dependencies must have at least one allowed value');
-      return;
-    }
+    // Type-specific validations
+    switch (ruleType) {
+      case 'filter':
+      case 'validation':
+        if (targetField.fieldType === 'dropdown' && !newDependency.allowedValues?.length) {
+          setError('Dropdown dependencies must have at least one allowed value');
+          return;
+        }
+        if (targetField.fieldType === 'string' && !newDependency.stringConstraint) {
+          setError('String dependencies must have a constraint');
+          return;
+        }
+        break;
 
-    if (targetField.fieldType === 'string' && !newDependency.stringConstraint) {
-      setError('String dependencies must have a constraint');
-      return;
+      case 'transform':
+        if (!newDependency.transformTo) {
+          setError('Transform rule must have target type configured');
+          return;
+        }
+        break;
+
+      case 'visibility':
+        if (!newDependency.visibilityAction) {
+          setError('Visibility rule must have action (show/hide)');
+          return;
+        }
+        break;
+
+      case 'required':
+        if (!newDependency.requiredAction) {
+          setError('Required rule must have action (make_required/make_optional)');
+          return;
+        }
+        break;
+
+      case 'autofill':
+        if (!newDependency.autofillValue) {
+          setError('Autofill rule must have a value');
+          return;
+        }
+        break;
+
+      case 'cross_validation':
+        if (!newDependency.crossValidation) {
+          setError('Cross-validation rule must have configuration');
+          return;
+        }
+        break;
     }
 
     const rule: DependencyRule = {
       id: generateId(),
+      ruleType,
+      priority: dependencyPriority,
       sourceField: newDependency.sourceField,
       sourceValue: newDependency.sourceValue,
+      sourceCondition: dependencySourceCondition,
       targetField: newDependency.targetField,
       targetFieldType: (targetField.fieldType as 'dropdown' | 'string'),
       allowedValues: newDependency.allowedValues,
       stringConstraint: newDependency.stringConstraint,
+      transformTo: newDependency.transformTo,
+      visibilityAction: newDependency.visibilityAction,
+      requiredAction: newDependency.requiredAction,
+      autofillValue: newDependency.autofillValue,
+      autofillAllowOverride: newDependency.autofillAllowOverride,
+      crossValidation: newDependency.crossValidation,
       explanation: newDependency.explanation,
     };
 
@@ -241,7 +323,9 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
       dependencies: [...prev.dependencies, rule],
     }));
 
-    setNewDependency({});
+    setNewDependency({ ruleType: 'filter' });
+    setDependencyPriority(50);
+    setDependencySourceCondition('equals');
     setShowDependencyForm(false);
     setError('');
     setSuccess(translations.admin.dependencyAddedSuccessfully);

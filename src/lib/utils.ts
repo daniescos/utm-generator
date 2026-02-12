@@ -1,4 +1,4 @@
-import type { AppConfig, DependencyRule } from './types';
+import type { AppConfig, DependencyRule, RuleType, UTMFieldState, SourceCondition } from './types';
 
 export function validateFieldValue(
   value: string,
@@ -92,40 +92,8 @@ export function validateDependency(
   rule: DependencyRule,
   config: AppConfig
 ): { valid: boolean; error?: string } {
-  // Check source field exists
-  const sourceField = config.fields.find(f => f.id === rule.sourceField);
-  if (!sourceField) {
-    return { valid: false, error: `Source field ${rule.sourceField} not found` };
-  }
-
-  // Check target field exists
-  const targetField = config.fields.find(f => f.id === rule.targetField);
-  if (!targetField) {
-    return { valid: false, error: `Target field ${rule.targetField} not found` };
-  }
-
-  // Source field must be dropdown (only dropdowns trigger rules)
-  if (sourceField.fieldType !== 'dropdown') {
-    return {
-      valid: false,
-      error: `Source field must be a dropdown type (current: ${sourceField.fieldType})`
-    };
-  }
-
-  // Check source value exists in source field options
-  if (!sourceField.options.includes(rule.sourceValue)) {
-    return { valid: false, error: `Source value ${rule.sourceValue} not in source field options` };
-  }
-
-  // Validate based on target field type
-  switch (rule.targetFieldType || targetField.fieldType) {
-    case 'dropdown':
-      return validateDropdownDependency(rule, targetField);
-    case 'string':
-      return validateStringDependency(rule);
-    default:
-      return { valid: false, error: `Unsupported target field type: ${targetField.fieldType}` };
-  }
+  // Use enhanced validation that supports all rule types
+  return validateDependencyEnhanced(rule, config);
 }
 
 function validateDropdownDependency(
@@ -265,6 +233,375 @@ export function validateStringAgainstRules(
   }
 
   return { valid: true };
+}
+
+/**
+ * Evaluate if a rule should be active based on source condition
+ */
+export function evaluateSourceCondition(
+  rule: DependencyRule,
+  sourceValue: string | undefined
+): boolean {
+  if (!sourceValue) return false;
+
+  const condition = rule.sourceCondition || 'equals';
+
+  switch (condition) {
+    case 'equals':
+      return sourceValue === rule.sourceValue;
+
+    case 'not_equals':
+      return sourceValue !== rule.sourceValue;
+
+    case 'in':
+      return (rule.sourceValues || []).includes(sourceValue);
+
+    case 'not_in':
+      return !(rule.sourceValues || []).includes(sourceValue);
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Get all active rules for the current state
+ */
+export function getActiveRules(
+  selectedValues: Record<string, string>,
+  config: AppConfig
+): Map<string, DependencyRule[]> {
+  const activeRulesByField = new Map<string, DependencyRule[]>();
+
+  for (const rule of config.dependencies) {
+    const isActive = evaluateSourceCondition(
+      rule,
+      selectedValues[rule.sourceField]
+    );
+
+    if (isActive) {
+      const existing = activeRulesByField.get(rule.targetField) || [];
+      existing.push(rule);
+      activeRulesByField.set(rule.targetField, existing);
+    }
+  }
+
+  // Sort by priority (higher first)
+  for (const [field, rules] of activeRulesByField) {
+    rules.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    activeRulesByField.set(field, rules);
+  }
+
+  return activeRulesByField;
+}
+
+/**
+ * Check if multiple rules conflict with each other
+ */
+export function checkRuleConflicts(rules: DependencyRule[]): boolean {
+  if (rules.length <= 1) return false;
+
+  // Check for conflicting visibility rules
+  const visibilityRules = rules.filter(r => r.ruleType === 'visibility');
+  if (visibilityRules.length > 1) {
+    const actions = new Set(visibilityRules.map(r => r.visibilityAction));
+    if (actions.size > 1) return true;
+  }
+
+  // Check for conflicting required rules
+  const requiredRules = rules.filter(r => r.ruleType === 'required');
+  if (requiredRules.length > 1) {
+    const actions = new Set(requiredRules.map(r => r.requiredAction));
+    if (actions.size > 1) return true;
+  }
+
+  // Check for conflicting transform rules
+  const transformRules = rules.filter(r => r.ruleType === 'transform');
+  if (transformRules.length > 1) {
+    const types = new Set(transformRules.map(r => r.transformTo?.fieldType));
+    if (types.size > 1) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Compute field states based on active rules
+ */
+export function computeFieldStates(
+  selectedValues: Record<string, string>,
+  config: AppConfig
+): Record<string, UTMFieldState> {
+  const activeRules = getActiveRules(selectedValues, config);
+  const states: Record<string, UTMFieldState> = {};
+
+  for (const field of config.fields) {
+    const rules = activeRules.get(field.id) || [];
+
+    // Determine visibility
+    const hideRule = rules.find(r => r.ruleType === 'visibility' && r.visibilityAction === 'hide');
+    const isVisible = !hideRule;
+
+    // Determine current field type (apply transforms)
+    const transformRule = rules.find(r => r.ruleType === 'transform');
+    const currentFieldType = transformRule?.transformTo?.fieldType || field.fieldType;
+
+    // Determine if required
+    const requiredRule = rules.find(r => r.ruleType === 'required');
+    const isRequired = requiredRule?.requiredAction === 'make_required' || false;
+
+    // Check for conflicts
+    const hasConflict = checkRuleConflicts(rules);
+
+    states[field.id] = {
+      fieldId: field.id,
+      originalFieldType: field.fieldType,
+      currentFieldType,
+      isVisible,
+      isRequired,
+      appliedRules: rules.map(r => r.id),
+      hasConflict,
+    };
+  }
+
+  return states;
+}
+
+/**
+ * Validate cross-field relationships
+ */
+export function validateCrossField(
+  rule: DependencyRule,
+  selectedValues: Record<string, string>
+): { valid: boolean; error?: string } {
+  if (!rule.crossValidation) {
+    return { valid: true };
+  }
+
+  const cv = rule.crossValidation;
+
+  if (cv.allowedCombinations && cv.allowedCombinations.length > 0) {
+    const targetValue = selectedValues[rule.targetField];
+
+    const isAllowed = cv.allowedCombinations.some(combo =>
+      combo.targetValue === targetValue
+    );
+
+    if (!isAllowed) {
+      return {
+        valid: false,
+        error: cv.validationRule || 'Combinação de campos inválida'
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate transform rule at creation time
+ */
+export function validateTransformRule(
+  rule: DependencyRule,
+  config: AppConfig
+): { valid: boolean; error?: string } {
+  if (!rule.transformTo) {
+    return { valid: false, error: 'Transform rule must have transformTo configuration' };
+  }
+
+  const { fieldType, dropdownOptions, stringConstraint } = rule.transformTo;
+
+  if (!fieldType) {
+    return { valid: false, error: 'Target field type must be specified' };
+  }
+
+  // Validate transform to dropdown
+  if (fieldType === 'dropdown' && dropdownOptions) {
+    const targetField = config.fields.find(f => f.id === rule.targetField);
+    if (targetField && targetField.fieldType === 'dropdown') {
+      const invalidOptions = dropdownOptions.filter(
+        opt => !targetField.options.includes(opt)
+      );
+      if (invalidOptions.length > 0) {
+        return { valid: false, error: `Invalid dropdown options: ${invalidOptions.join(', ')}` };
+      }
+    }
+  }
+
+  // Validate transform to string with constraint
+  if (fieldType === 'string' && stringConstraint) {
+    const constraintValidation = validateStringDependency({ ...rule, stringConstraint });
+    if (!constraintValidation.valid) {
+      return constraintValidation;
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate visibility rule at creation time
+ */
+export function validateVisibilityRule(
+  rule: DependencyRule,
+  config: AppConfig
+): { valid: boolean; error?: string } {
+  if (!rule.visibilityAction) {
+    return { valid: false, error: 'Visibility rule must have an action (show/hide)' };
+  }
+
+  if (!['show', 'hide'].includes(rule.visibilityAction)) {
+    return { valid: false, error: 'Invalid visibility action' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate required rule at creation time
+ */
+export function validateRequiredRule(
+  rule: DependencyRule,
+  config: AppConfig
+): { valid: boolean; error?: string } {
+  if (!rule.requiredAction) {
+    return { valid: false, error: 'Required rule must have an action (make_required/make_optional)' };
+  }
+
+  if (!['make_required', 'make_optional'].includes(rule.requiredAction)) {
+    return { valid: false, error: 'Invalid required action' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate autofill rule at creation time
+ */
+export function validateAutofillRule(
+  rule: DependencyRule,
+  config: AppConfig
+): { valid: boolean; error?: string } {
+  if (!rule.autofillValue) {
+    return { valid: false, error: 'Autofill rule must have a value to fill' };
+  }
+
+  const targetField = config.fields.find(f => f.id === rule.targetField);
+  if (!targetField) {
+    return { valid: false, error: 'Target field not found' };
+  }
+
+  // If target is dropdown, validate value exists in options
+  if (targetField.fieldType === 'dropdown') {
+    if (!targetField.options.includes(rule.autofillValue)) {
+      return { valid: false, error: `Autofill value "${rule.autofillValue}" not in target field options` };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate cross-validation rule at creation time
+ */
+export function validateCrossValidationRule(
+  rule: DependencyRule,
+  config: AppConfig
+): { valid: boolean; error?: string } {
+  if (!rule.crossValidation) {
+    return { valid: false, error: 'Cross-validation rule must have configuration' };
+  }
+
+  const cv = rule.crossValidation;
+
+  if (!cv.validationRule && (!cv.allowedCombinations || cv.allowedCombinations.length === 0)) {
+    return { valid: false, error: 'Cross-validation must have either a description or allowed combinations' };
+  }
+
+  if (cv.allowedCombinations && cv.allowedCombinations.length > 0) {
+    const targetField = config.fields.find(f => f.id === rule.targetField);
+    if (targetField && targetField.fieldType === 'dropdown') {
+      const invalidCombos = cv.allowedCombinations.filter(
+        combo => !targetField.options.includes(combo.targetValue)
+      );
+      if (invalidCombos.length > 0) {
+        return { valid: false, error: 'Some allowed combinations have invalid target values' };
+      }
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Update validateDependency to handle all rule types
+ */
+export function validateDependencyEnhanced(
+  rule: DependencyRule,
+  config: AppConfig
+): { valid: boolean; error?: string } {
+  // Check source and target fields exist
+  const sourceField = config.fields.find(f => f.id === rule.sourceField);
+  if (!sourceField) {
+    return { valid: false, error: `Source field ${rule.sourceField} not found` };
+  }
+
+  const targetField = config.fields.find(f => f.id === rule.targetField);
+  if (!targetField) {
+    return { valid: false, error: `Target field ${rule.targetField} not found` };
+  }
+
+  // Source field must be dropdown (only dropdowns trigger rules)
+  if (sourceField.fieldType !== 'dropdown') {
+    return {
+      valid: false,
+      error: `Source field must be a dropdown type (current: ${sourceField.fieldType})`
+    };
+  }
+
+  // For 'in' and 'not_in', check sourceValues exist
+  const condition = rule.sourceCondition || 'equals';
+  if ((condition === 'in' || condition === 'not_in') && rule.sourceValues) {
+    const invalidValues = rule.sourceValues.filter(
+      val => !sourceField.options.includes(val)
+    );
+    if (invalidValues.length > 0) {
+      return { valid: false, error: `Invalid source values: ${invalidValues.join(', ')}` };
+    }
+  }
+
+  // For 'equals' and 'not_equals', check sourceValue exists
+  if ((condition === 'equals' || condition === 'not_equals') && !sourceField.options.includes(rule.sourceValue)) {
+    return { valid: false, error: `Source value ${rule.sourceValue} not in source field options` };
+  }
+
+  // Type-specific validation
+  const ruleType = rule.ruleType || 'filter';
+  switch (ruleType) {
+    case 'filter':
+      return validateDropdownDependency(rule, targetField);
+
+    case 'validation':
+      return validateStringDependency(rule);
+
+    case 'transform':
+      return validateTransformRule(rule, config);
+
+    case 'visibility':
+      return validateVisibilityRule(rule, config);
+
+    case 'required':
+      return validateRequiredRule(rule, config);
+
+    case 'autofill':
+      return validateAutofillRule(rule, config);
+
+    case 'cross_validation':
+      return validateCrossValidationRule(rule, config);
+
+    default:
+      return { valid: false, error: `Unknown rule type: ${ruleType}` };
+  }
 }
 
 export function copyToClipboard(text: string): Promise<boolean> {
