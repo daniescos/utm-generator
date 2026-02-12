@@ -27,7 +27,7 @@ export interface StringConstraint {
 }
 
 export interface TransformRuleConfig {
-  fieldType: 'dropdown' | 'string';
+  fieldType: 'dropdown' | 'string' | 'integer';
   dropdownOptions?: string[];
   stringConstraint?: StringConstraint;
   clearValueOnTransform?: boolean;
@@ -54,7 +54,7 @@ export interface DependencyRule {
 
   // Target configuration
   targetField: string;                   // field affected by rule
-  targetFieldType?: 'dropdown' | 'string';
+  targetFieldType?: 'dropdown' | 'string' | 'integer';
 
   // EXISTING: Dropdown filtering (ruleType: 'filter')
   allowedValues?: string[];
@@ -100,7 +100,7 @@ export interface AppConfig {
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  version: 2,
+  version: 3,
   adminPassword: "admin123",
   fields: [
     {

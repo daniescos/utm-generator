@@ -15,8 +15,8 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
   const [sourceField, setSourceField] = useState('');
   const [sourceValue, setSourceValue] = useState('');
   const [targetField, setTargetField] = useState('');
-  const [priority, setPriority] = useState(50);
-  const [transformFieldType, setTransformFieldType] = useState<'dropdown' | 'string'>('string');
+  const [filterAllowedValues, setFilterAllowedValues] = useState<string[]>([]);
+  const [transformFieldType, setTransformFieldType] = useState<'dropdown' | 'string' | 'integer'>('string');
   const [visibilityAction, setVisibilityAction] = useState<'show' | 'hide'>('hide');
   const [requiredAction, setRequiredAction] = useState<'make_required' | 'make_optional'>('make_required');
   const [autofillValue, setAutofillValue] = useState('');
@@ -28,7 +28,7 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
     setSourceField('');
     setSourceValue('');
     setTargetField('');
-    setPriority(50);
+    setFilterAllowedValues([]);
     setTransformFieldType('string');
     setVisibilityAction('hide');
     setRequiredAction('make_required');
@@ -43,20 +43,28 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
       return;
     }
 
+    if (ruleType === 'filter' && filterAllowedValues.length === 0) {
+      onError('Selecione pelo menos uma opção permitida para a regra de filtro');
+      return;
+    }
+
     const rule: DependencyRule = {
       id: generateId(),
       ruleType,
-      priority,
       sourceField,
       sourceValue,
       sourceCondition: 'equals',
       targetField,
-      targetFieldType: (config.fields.find(f => f.id === targetField)?.fieldType as 'dropdown' | 'string'),
+      targetFieldType: (config.fields.find(f => f.id === targetField)?.fieldType as 'dropdown' | 'string' | 'integer'),
       explanation: explanation || undefined,
     };
 
     // Type-specific properties
     switch (ruleType) {
+      case 'filter':
+        rule.allowedValues = filterAllowedValues;
+        break;
+
       case 'transform':
         rule.transformTo = {
           fieldType: transformFieldType,
@@ -85,10 +93,49 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
 
   return (
     <div className="border border-red-900/50 rounded-lg p-4 space-y-4">
+      {/* Source Field */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1">
+          Se campo
+        </label>
+        <select
+          value={sourceField}
+          onChange={(e) => {
+            setSourceField(e.target.value);
+            setSourceValue('');
+          }}
+          className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
+        >
+          <option value="">{translations.admin.selectSourceField}</option>
+          {sortedFields.filter(f => f.fieldType === 'dropdown').map(f => (
+            <option key={f.id} value={f.id}>{f.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Source Value */}
+      {sourceField && (
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            igual a
+          </label>
+          <select
+            value={sourceValue}
+            onChange={(e) => setSourceValue(e.target.value)}
+            className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
+          >
+            <option value="">{translations.admin.selectValue}</option>
+            {config.fields.find(f => f.id === sourceField)?.options.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Rule Type Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
-          {translations.admin.ruleType}
+          qual tipo de regra
         </label>
         <select
           value={ruleType}
@@ -96,62 +143,20 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
           className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
         >
           <option value="filter">{translations.admin.ruleTypes.filter}</option>
-          <option value="validation">{translations.admin.ruleTypes.validation}</option>
           <option value="transform">{translations.admin.ruleTypes.transform}</option>
           <option value="visibility">{translations.admin.ruleTypes.visibility}</option>
           <option value="required">{translations.admin.ruleTypes.required}</option>
           <option value="autofill">{translations.admin.ruleTypes.autofill}</option>
-          <option value="cross_validation">{translations.admin.ruleTypes.cross_validation}</option>
         </select>
         <p className="text-xs text-gray-500 mt-1">
           {translations.admin.ruleTypeDescriptions[ruleType]}
         </p>
       </div>
 
-      {/* Source Field & Value */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            {translations.admin.ifField}
-          </label>
-          <select
-            value={sourceField}
-            onChange={(e) => {
-              setSourceField(e.target.value);
-              setSourceValue('');
-            }}
-            className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
-          >
-            <option value="">{translations.admin.selectSourceField}</option>
-            {sortedFields.filter(f => f.fieldType === 'dropdown').map(f => (
-              <option key={f.id} value={f.id}>{f.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {sourceField && (
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              {translations.admin.equals}
-            </label>
-            <select
-              value={sourceValue}
-              onChange={(e) => setSourceValue(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
-            >
-              <option value="">{translations.admin.selectValue}</option>
-              {config.fields.find(f => f.id === sourceField)?.options.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
       {/* Target Field */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
-          {translations.admin.thenLimitField}
+          então limitar campo
         </label>
         <select
           value={targetField}
@@ -165,21 +170,42 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
         </select>
       </div>
 
-      {/* Priority */}
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
-          {translations.admin.priority}
-        </label>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          value={priority}
-          onChange={(e) => setPriority(parseInt(e.target.value, 10))}
-          className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
-        />
-        <p className="text-xs text-gray-500 mt-1">{translations.admin.priorityHelp}</p>
-      </div>
+      {/* Multi-Select for Filter Rule */}
+      {ruleType === 'filter' && targetField &&
+       config.fields.find(f => f.id === targetField)?.fieldType === 'dropdown' && (
+        <div className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-900/10 rounded">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            a (selecione múltiplos)
+          </label>
+          <div className="space-y-2 max-h-48 overflow-y-auto bg-gray-900 border border-red-900/50 rounded p-3">
+            {config.fields.find(f => f.id === targetField)?.options.map(option => (
+              <label
+                key={option}
+                className="flex items-center gap-2 cursor-pointer hover:bg-gray-800 p-1 rounded transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={filterAllowedValues.includes(option)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setFilterAllowedValues(prev => [...prev, option]);
+                    } else {
+                      setFilterAllowedValues(prev => prev.filter(v => v !== option));
+                    }
+                  }}
+                  className="w-4 h-4 accent-red-600"
+                />
+                <span className="text-sm text-gray-300">{option}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            {filterAllowedValues.length === 1
+              ? '1 opção selecionada'
+              : `${filterAllowedValues.length} opções selecionadas`}
+          </p>
+        </div>
+      )}
 
       {/* Type-Specific Configuration */}
       {ruleType === 'transform' && (
@@ -189,11 +215,12 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
           </label>
           <select
             value={transformFieldType}
-            onChange={(e) => setTransformFieldType(e.target.value as 'dropdown' | 'string')}
+            onChange={(e) => setTransformFieldType(e.target.value as 'dropdown' | 'string' | 'integer')}
             className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
           >
             <option value="dropdown">Dropdown</option>
             <option value="string">String (Texto Livre)</option>
+            <option value="integer">Integer (Números Inteiros)</option>
           </select>
         </div>
       )}

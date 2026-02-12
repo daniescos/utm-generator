@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Copy, Check, Info, AlertCircle, AlertTriangle } from 'lucide-react';
 import { loadConfigAsync, loadConfig } from '../lib/storage';
-import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard, getApplicableDependencyRules, validateStringAgainstRules, getActiveRules, computeFieldStates, validateCrossField } from '../lib/utils';
+import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard, getApplicableDependencyRules, validateStringAgainstRules, getActiveRules, computeFieldStates } from '../lib/utils';
 import { translations } from '../lib/translations';
 import type { UTMFieldState } from '../lib/types';
 import { Tooltip } from './Tooltip';
@@ -82,18 +82,18 @@ export function UserGenerator() {
       }
     }
 
-    // Check cross-validation rules
-    const activeRules = getActiveRules(selectedValues, config);
-    for (const [, rules] of activeRules) {
-      for (const rule of rules) {
-        if (rule.ruleType === 'cross_validation') {
-          const validation = validateCrossField(rule, selectedValues);
-          if (!validation.valid) {
-            return false;
-          }
-        }
-      }
-    }
+    // Cross-validation rules (deprecated - commented out for backwards compatibility)
+    // const activeRules = getActiveRules(selectedValues, config);
+    // for (const [, rules] of activeRules) {
+    //   for (const rule of rules) {
+    //     if (rule.ruleType === 'cross_validation') {
+    //       const validation = validateCrossField(rule, selectedValues);
+    //       if (!validation.valid) {
+    //         return false;
+    //       }
+    //     }
+    //   }
+    // }
 
     // Check all string validations pass
     for (const fieldId in fieldErrors) {

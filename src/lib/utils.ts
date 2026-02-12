@@ -436,6 +436,13 @@ export function validateTransformRule(
     }
   }
 
+  // Validate transform to integer
+  if (fieldType === 'integer') {
+    // Integer type requires no additional validation at transform creation time
+    // Runtime validation handled by validateFieldValue()
+    return { valid: true };
+  }
+
   return { valid: true };
 }
 

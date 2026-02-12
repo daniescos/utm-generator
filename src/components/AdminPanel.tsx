@@ -170,6 +170,10 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
     const targetField = config.fields.find(f => f.id === rule.targetField);
     const ruleType = rule.ruleType || 'filter';
 
+    // Mark legacy rules
+    const isLegacy = ruleType === 'validation' || ruleType === 'cross_validation';
+    const legacyPrefix = isLegacy ? '⚠️ [LEGADA] ' : '';
+
     let description = '';
 
     switch (ruleType) {
@@ -217,7 +221,7 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
         description = `Regra de tipo desconhecido`;
     }
 
-    return description;
+    return legacyPrefix + description;
   };
 
   const handleAddDependency = (rule: DependencyRule) => {
@@ -337,6 +341,20 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
         {success && (
           <div className="mb-4 p-4 bg-green-900/30 border border-green-700 rounded-lg text-green-300">
             {success}
+          </div>
+        )}
+
+        {/* Legacy Rules Warning */}
+        {config.dependencies.some(d => d.ruleType === 'validation' || d.ruleType === 'cross_validation') && (
+          <div className="mb-4 p-4 bg-orange-900/30 border border-orange-700 rounded-lg text-orange-300">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="w-5 h-5" />
+              <strong>Regras Legadas Detectadas</strong>
+            </div>
+            <p className="text-sm">
+              Este sistema contém regras de tipo "validação" ou "validação cruzada" que foram descontinuadas.
+              Estas regras continuam funcionando, mas recomendamos atualizá-las ou removê-las.
+            </p>
           </div>
         )}
 
@@ -611,8 +629,16 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
 
               <div className="space-y-2">
                 {config.dependencies.map(rule => {
+                  const isLegacy = rule.ruleType === 'validation' || rule.ruleType === 'cross_validation';
                   return (
-                    <div key={rule.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                    <div
+                      key={rule.id}
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        isLegacy
+                          ? 'bg-orange-900/20 border border-orange-700/50'
+                          : 'bg-slate-700'
+                      }`}
+                    >
                       <div className="flex-1">
                         <p className="text-sm text-gray-300">
                           {formatRuleDisplay(rule)}
@@ -620,6 +646,11 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                         {rule.explanation && (
                           <p className="text-xs text-gray-400 mt-1 italic">
                             "{rule.explanation}"
+                          </p>
+                        )}
+                        {isLegacy && (
+                          <p className="text-xs text-orange-400 mt-1">
+                            ⚠️ Esta é uma regra legada. Considere atualizar ou remover.
                           </p>
                         )}
                       </div>
