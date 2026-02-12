@@ -82,7 +82,6 @@ export function DependencyForm({ config, onAddRule, onError, sortedFields }: Dep
     resetForm();
   };
 
-  const targetFieldObj = config.fields.find(f => f.id === targetField);
 
   return (
     <div className="border border-red-900/50 rounded-lg p-4 space-y-4">

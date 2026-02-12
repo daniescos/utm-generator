@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Plus, Trash2, Download, Upload, RotateCcw, Lock, Edit2, AlertCircle } from 'lucide-react';
 import { loadConfig, loadConfigAsync, saveConfig, exportConfig, importConfig, resetConfig } from '../lib/storage';
-import type { AppConfig, UTMField, DependencyRule, RuleType } from '../lib/types';
+import type { AppConfig, UTMField, DependencyRule } from '../lib/types';
 import { generateId, validateDependency } from '../lib/utils';
 import { translations } from '../lib/translations';
 import { DependencyForm } from './DependencyForm';
@@ -35,7 +35,12 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [editFieldDescription, setEditFieldDescription] = useState('');
 
   const handleSave = () => {
-    saveConfig(config);
+    // Increment version to trigger client-side sync for all users
+    const updatedConfig = {
+      ...config,
+      version: (config.version || 1) + 1,
+    };
+    saveConfig(updatedConfig);
     setSuccess(translations.admin.successMessages.configurationSavedSuccessfully);
     setTimeout(() => setSuccess(''), 3000);
   };
@@ -159,18 +164,6 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   };
 
   // Dependency Management
-  const getStringConstraintPlaceholder = (type: string): string => {
-    switch (type) {
-      case 'pattern': return 'ex: ^[a-z]+_campaign$';
-      case 'contains': return 'ex: promo';
-      case 'startsWith': return 'ex: email_';
-      case 'endsWith': return 'ex: _2024';
-      case 'equals': return 'ex: special_campaign';
-      case 'minLength': return 'ex: 5';
-      case 'maxLength': return 'ex: 50';
-      default: return '';
-    }
-  };
 
   const formatRuleDisplay = (rule: DependencyRule): string => {
     const sourceField = config.fields.find(f => f.id === rule.sourceField);
@@ -616,204 +609,6 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
                 />
               )}
 
-              {!showDependencyForm && (
-                <div className="border border-red-900/50 rounded-lg p-4 space-y-3 hidden">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.ifField}</label>
-                    <select
-                      value={newDependency.sourceField || ''}
-                      onChange={(e) => setNewDependency(prev => ({ ...prev, sourceField: e.target.value }))}
-                      className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
-                    >
-                      <option value="">{translations.admin.selectSourceField}</option>
-                      {sortedFields.filter(f => f.fieldType === 'dropdown').map(f => (
-                        <option key={f.id} value={f.id}>{f.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {newDependency.sourceField && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.equals}</label>
-                      <select
-                        value={newDependency.sourceValue || ''}
-                        onChange={(e) => setNewDependency(prev => ({ ...prev, sourceValue: e.target.value }))}
-                        className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
-                      >
-                        <option value="">{translations.admin.selectValue}</option>
-                        {config.fields.find(f => f.id === newDependency.sourceField)?.options.map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">{translations.admin.thenLimitField}</label>
-                    <select
-                      value={newDependency.targetField || ''}
-                      onChange={(e) => {
-                        setNewDependency(prev => ({
-                          ...prev,
-                          targetField: e.target.value,
-                          allowedValues: undefined,
-                          stringConstraint: undefined,
-                        }));
-                      }}
-                      className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white focus:outline-none focus:border-red-600"
-                    >
-                      <option value="">{translations.admin.selectSourceField}</option>
-                      {sortedFields.map(f => (
-                        <option key={f.id} value={f.id}>{f.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {newDependency.targetField && (() => {
-                    const targetField = config.fields.find(f => f.id === newDependency.targetField);
-
-                    if (targetField?.fieldType === 'dropdown') {
-                      return (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            {translations.admin.selectAllowedValues}
-                          </label>
-                          <div className="max-h-48 overflow-y-auto border border-red-900/50 rounded p-3 space-y-2 bg-gray-900">
-                            {targetField.options.map(option => (
-                              <label key={option} className="flex items-center gap-2 cursor-pointer hover:bg-gray-800 p-2 rounded">
-                                <input
-                                  type="checkbox"
-                                  checked={(newDependency.allowedValues || []).includes(option)}
-                                  onChange={(e) => {
-                                    const currentValues = newDependency.allowedValues || [];
-                                    setNewDependency(prev => ({
-                                      ...prev,
-                                      allowedValues: e.target.checked
-                                        ? [...currentValues, option]
-                                        : currentValues.filter(v => v !== option)
-                                    }));
-                                  }}
-                                  className="w-4 h-4 accent-red-600"
-                                />
-                                <span className="text-white text-sm">{option}</span>
-                              </label>
-                            ))}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {translations.admin.selectedValues}: {(newDependency.allowedValues || []).length}
-                          </p>
-                        </div>
-                      );
-                    }
-
-                    if (targetField?.fieldType === 'string') {
-                      return (
-                        <div className="space-y-3">
-                          <label className="block text-sm font-medium text-gray-300 mb-1">
-                            {translations.admin.stringConstraintType}
-                          </label>
-                          <select
-                            value={newDependency.stringConstraint?.type || ''}
-                            onChange={(e) => setNewDependency(prev => ({
-                              ...prev,
-                              stringConstraint: {
-                                type: e.target.value as any,
-                                value: prev.stringConstraint?.value || '',
-                                caseSensitive: prev.stringConstraint?.caseSensitive,
-                              }
-                            }))}
-                            className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white"
-                          >
-                            <option value="">{translations.admin.selectConstraintType}</option>
-                            <option value="pattern">{translations.admin.matchesPattern}</option>
-                            <option value="contains">{translations.admin.contains}</option>
-                            <option value="startsWith">{translations.admin.startsWith}</option>
-                            <option value="endsWith">{translations.admin.endsWith}</option>
-                            <option value="equals">{translations.admin.exactlyEquals}</option>
-                            <option value="minLength">{translations.admin.minLength}</option>
-                            <option value="maxLength">{translations.admin.maxLength}</option>
-                          </select>
-
-                          {newDependency.stringConstraint?.type && (
-                            <>
-                              <input
-                                type="text"
-                                value={newDependency.stringConstraint.value}
-                                onChange={(e) => setNewDependency(prev => ({
-                                  ...prev,
-                                  stringConstraint: {
-                                    ...prev.stringConstraint!,
-                                    value: e.target.value,
-                                  }
-                                }))}
-                                placeholder={getStringConstraintPlaceholder(newDependency.stringConstraint.type)}
-                                className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500"
-                              />
-
-                              {['pattern', 'contains', 'startsWith', 'endsWith', 'equals'].includes(newDependency.stringConstraint.type) && (
-                                <label className="flex items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={newDependency.stringConstraint.caseSensitive || false}
-                                    onChange={(e) => setNewDependency(prev => ({
-                                      ...prev,
-                                      stringConstraint: {
-                                        ...prev.stringConstraint!,
-                                        caseSensitive: e.target.checked,
-                                      }
-                                    }))}
-                                    className="w-4 h-4 accent-red-600"
-                                  />
-                                  <span className="text-sm text-gray-300">{translations.admin.caseSensitive}</span>
-                                </label>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      );
-                    }
-
-                    return null;
-                  })()}
-
-                  {newDependency.targetField && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        {translations.admin.ruleExplanation} <span className="text-gray-500">({translations.admin.optional})</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={newDependency.explanation || ''}
-                        onChange={(e) => setNewDependency(prev => ({
-                          ...prev,
-                          explanation: e.target.value,
-                        }))}
-                        placeholder={translations.admin.ruleExplanationPlaceholder}
-                        className="w-full px-3 py-2 bg-gray-900 border border-red-900/50 rounded text-white placeholder-gray-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        {translations.admin.ruleExplanationHelp}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleAddDependency}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-                    >
-                      {translations.admin.addRule}
-                    </button>
-                    <button
-                      onClick={() => setShowDependencyForm(false)}
-                      className="px-4 py-2 bg-slate-700 hover:bg-gray-800 text-white rounded transition-colors"
-                    >
-                      {translations.admin.cancel}
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div className="space-y-2">
                 {config.dependencies.map(rule => {
                   return (
@@ -845,6 +640,25 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
           {/* Config Tab */}
           {activeTab === 'config' && (
             <div className="space-y-6">
+              {/* Versioning Info */}
+              <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 space-y-3">
+                <h3 className="text-lg font-semibold text-blue-200 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  {translations.admin.versioningInfo.title}
+                </h3>
+                <p className="text-sm text-blue-300">
+                  {translations.admin.versioningInfo.description}
+                </p>
+                <div className="bg-blue-950/50 rounded p-3 border border-blue-700/50">
+                  <p className="text-xs text-blue-300 font-mono">
+                    {translations.admin.versioningInfo.howItWorks}
+                  </p>
+                </div>
+                <div className="text-sm text-blue-300">
+                  <strong>Versão atual da configuração:</strong> <span className="font-mono text-blue-200">{config.version || 1}</span>
+                </div>
+              </div>
+
               {/* Password Change */}
               <div className="border-b border-red-900/50 pb-6">
                 <h3 className="text-lg font-semibold text-white mb-4">{translations.admin.changeAdminPassword}</h3>

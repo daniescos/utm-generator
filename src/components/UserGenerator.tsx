@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Copy, Check, Info, AlertCircle, AlertTriangle } from 'lucide-react';
 import { loadConfigAsync, loadConfig } from '../lib/storage';
 import { generateUTMUrl, getAvailableOptionsForField, copyToClipboard, getApplicableDependencyRules, validateStringAgainstRules, getActiveRules, computeFieldStates, validateCrossField } from '../lib/utils';
@@ -84,7 +84,7 @@ export function UserGenerator() {
 
     // Check cross-validation rules
     const activeRules = getActiveRules(selectedValues, config);
-    for (const [fieldId, rules] of activeRules) {
+    for (const [, rules] of activeRules) {
       for (const rule of rules) {
         if (rule.ruleType === 'cross_validation') {
           const validation = validateCrossField(rule, selectedValues);

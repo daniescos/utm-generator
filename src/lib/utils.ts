@@ -1,4 +1,4 @@
-import type { AppConfig, DependencyRule, RuleType, UTMFieldState, SourceCondition } from './types';
+import type { AppConfig, DependencyRule, UTMFieldState } from './types';
 
 export function validateFieldValue(
   value: string,
@@ -443,8 +443,7 @@ export function validateTransformRule(
  * Validate visibility rule at creation time
  */
 export function validateVisibilityRule(
-  rule: DependencyRule,
-  config: AppConfig
+  rule: DependencyRule
 ): { valid: boolean; error?: string } {
   if (!rule.visibilityAction) {
     return { valid: false, error: 'Visibility rule must have an action (show/hide)' };
@@ -461,8 +460,7 @@ export function validateVisibilityRule(
  * Validate required rule at creation time
  */
 export function validateRequiredRule(
-  rule: DependencyRule,
-  config: AppConfig
+  rule: DependencyRule
 ): { valid: boolean; error?: string } {
   if (!rule.requiredAction) {
     return { valid: false, error: 'Required rule must have an action (make_required/make_optional)' };
@@ -588,10 +586,10 @@ export function validateDependencyEnhanced(
       return validateTransformRule(rule, config);
 
     case 'visibility':
-      return validateVisibilityRule(rule, config);
+      return validateVisibilityRule(rule);
 
     case 'required':
-      return validateRequiredRule(rule, config);
+      return validateRequiredRule(rule);
 
     case 'autofill':
       return validateAutofillRule(rule, config);

@@ -175,7 +175,13 @@ export const translations = {
     },
 
     successMessages: {
-      configurationSavedSuccessfully: 'Configuração salva com sucesso!',
+      configurationSavedSuccessfully: 'Configuração salva com sucesso! Todos os usuários verão estas mudanças quando acessarem a plataforma.',
+    },
+
+    versioningInfo: {
+      title: 'Sincronização de Configuração',
+      description: 'Quando você clica em "Salvar Todas as Alterações", a versão da configuração é incrementada automaticamente. Isso avisa a todos os usuários que existe uma nova versão e eles receberão a configuração atualizada no próximo acesso.',
+      howItWorks: 'Como funciona: (1) Admin faz alterações → (2) Clica "Salvar" → Versão incrementa → (3) Usuários acessam plataforma → (4) Detectam versão diferente → (5) Carregam configuração global atualizada',
     },
   },
 
