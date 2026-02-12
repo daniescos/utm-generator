@@ -212,3 +212,27 @@ export function importConfig(jsonString: string): AppConfig {
 export function resetConfig(): void {
   saveConfig(DEFAULT_CONFIG);
 }
+
+// Save configuration to server (persists to config.json)
+export async function saveConfigToServer(config: AppConfig): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const response = await fetch('/api/config/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(config),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { success: false, error: errorData.error || 'Failed to save configuration' };
+    }
+
+    const data = await response.json();
+    return { success: true, message: data.message };
+  } catch (error) {
+    console.error('Error saving config to server:', error);
+    return { success: false, error: 'Failed to save configuration to server' };
+  }
+}

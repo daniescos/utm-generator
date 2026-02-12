@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Plus, Trash2, Download, Upload, RotateCcw, Lock, Edit2, AlertCircle } from 'lucide-react';
-import { loadConfig, loadConfigAsync, saveConfig, exportConfig, importConfig, resetConfig } from '../lib/storage';
+import { loadConfig, loadConfigAsync, saveConfig, exportConfig, importConfig, resetConfig, saveConfigToServer } from '../lib/storage';
 import type { AppConfig, UTMField, DependencyRule } from '../lib/types';
 import { generateId, validateDependency } from '../lib/utils';
 import { translations } from '../lib/translations';
@@ -34,15 +34,29 @@ export function AdminPanel({ onLogout }: AdminPanelProps) {
   const [editFieldOptions, setEditFieldOptions] = useState('');
   const [editFieldDescription, setEditFieldDescription] = useState('');
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Increment version to trigger client-side sync for all users
     const updatedConfig = {
       ...config,
       version: (config.version || 1) + 1,
     };
+
+    // Save to localStorage
     saveConfig(updatedConfig);
-    setSuccess(translations.admin.successMessages.configurationSavedSuccessfully);
-    setTimeout(() => setSuccess(''), 3000);
+
+    // Save to server (update config.json)
+    const result = await saveConfigToServer(updatedConfig);
+
+    if (result.success) {
+      setSuccess(translations.admin.successMessages.configurationSavedSuccessfully);
+    } else {
+      setError(result.error || 'Failed to save configuration to server');
+    }
+
+    setTimeout(() => {
+      setSuccess('');
+      setError('');
+    }, 3000);
   };
 
   // Field Management
